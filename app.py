@@ -79,7 +79,9 @@ with col2:
 
 # 🛠️ 這裡已經移除了舊的快取，保證資料即時顯示
 try:
-    response = supabase.table("service_records").select("service_date, role, content, grace_notes").order("service_date", descending=True).execute()
+    #  新版正確寫法
+response = supabase.table("service_records").select("service_date, role, content, grace_notes").order("service_date", desc=True).execute()
+
     df_raw = pd.DataFrame(response.data)
 except Exception as e:
     st.error(f"讀取資料失敗：{e}")

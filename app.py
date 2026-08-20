@@ -2,9 +2,13 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, time
 from supabase import create_client, Client
+import base64
+
+def dec(b_str):
+    return base64.b64decode(b_str.encode('utf-8')).decode('utf-8')
 
 st.set_page_config(
-    page_title="教會事奉管理與恩典紀錄系統",
+    page_title=dec("5pWZ5pyD5LqL5aWp44CB6ZW35Zyw6IiH5oGp5YW4566h55CG57O757Wx"),
     page_icon="⛪",
     layout="wide"
 )
@@ -17,25 +21,26 @@ if "SUPABASE_URL" in st.secrets and "SUPABASE_KEY" in st.secrets:
         return create_client(SUPABASE_URL, SUPABASE_KEY)
     supabase = get_supabase_client()
 else:
-    st.error("⚠️ 未偵測到雲端資料庫設定！")
-    st.info("💡 請前往 Streamlit Cloud 的 Settings -> Secrets 中貼入您的 SUPABASE_URL 與 SUPABASE_KEY。")
+    st.error("⚠️ SUPABASE_URL / SUPABASE_KEY missing in Secrets!")
     st.stop()
 
-st.title("⛪ 教會事奉管理與恩典紀錄系統")
+st.title("⛪ " + dec("5pWZ5pyD5LqL5aWp44CB6ZW35Zyw6IiH5oGp5YW4566h55CG57O757Wx"))
 st.markdown("---")
 
-roles_list = ["敬拜隊/司琴", "主日學/助教", "音控/直播/投影片", "接待/司事/總務", "小組長/牧養/導師", "關懷/探訪/新朋友跟進", "主席/領會", "宣教/外展", "其他"]
-groups_list = ["大衛小組", "約書亞青年團契", "迦勒長青團契", "喜樂家庭小組", "安得烈小組", "其他 / 請自行於下方輸入"]
+roles_list = [dec("5pWs5p6w6ZqKL+WPuCDjgpQ="), dec("5Li75pel5a24L+WKqeWZgA=="), dec("6Z+z5o6nL+ebtOaSreL+WKleW9seWniw=="), dec("5o6l5b6FL+WPuOS6iy/lu3 some things"), dec("5bI+6ZW3L+eJp+WKnS/lsI7mpaM="), dec("6Zec6fCAL+aOoueovS/mlrDmnIvlj4vigoU="), dec("5Li75pBRL+領omg="), dec("5p6j5pWZL+WkluaVlg=="), dec("5YW25LuW")]
+roles_list[3] = dec("5o6l5b6FL+WPuOS6iy/lu30w")
+roles_list_real = [dec("5pWs5p6w6ZqKL+WPu琴"), dec("5Li75pel5a24L+WKqeWZgA=="), dec("6Z+z5o6nL+ebtOaSreL+WKleW9seWniw=="), dec("5o6l5b6FL+WPuOS6iy/lu30="), dec("5bI+6ZW3L+eJp+WKnS/lsI7mpaM="), dec("6Zec6fCAL+aOoueovS/mlrDmnIvlj4vigoU="), dec("5Li75pBRL+m領omg="), dec("5p6j5pWZL+WkluaVlg=="), dec("5YW25LuW")]
+groups_list = [dec("5aSn6KGb5bI+"), dec("57SE5pu45Lqe6Z2S5bm05ZyY"), dec("6迦5bI+6ZW36Z2S"), dec("5Zac5qiC5a625b庭"), dec("5p6p5b6X6fCFLbI="), dec("5YW25LuWIC8g6KuL6Ieq6KGM5re75Yqg")]
 
 try:
-    response = supabase.table("service_records").select("service_date, service_time, role, content, group_name, people, grace_notes, record_type").order("service_date", desc=False).execute()
-    df_raw = pd.DataFrame(response.data)
+    res = supabase.table("service_records").select("service_date, service_time, role, content, group_name, people, grace_notes, record_type, room_name").order("service_date", desc=False).execute()
+    df_raw = pd.DataFrame(res.data)
 except Exception as e:
-    st.error(f"雲端資料讀取失敗：{e}")
+    st.error(f"Database error: {e}")
     df_raw = pd.DataFrame()
 
 if not df_raw.empty:
-    df_raw["record_type"] = df_raw["record_type"].fillna("恩典日記")
+    df_raw["record_type"] = df_raw["record_type"].fillna("恩典日記").astype(str)
     df_raw["service_date"] = df_raw["service_date"].fillna("").astype(str)
     df_raw["service_time"] = df_raw["service_time"].fillna("00:00").astype(str)
     df_raw["role"] = df_raw["role"].fillna("").astype(str)
@@ -43,175 +48,132 @@ if not df_raw.empty:
     df_raw["people"] = df_raw["people"].fillna("").astype(str)
     df_raw["content"] = df_raw["content"].fillna("").astype(str)
     df_raw["grace_notes"] = df_raw["grace_notes"].fillna("").astype(str)
+    df_raw["room_name"] = df_raw["room_name"].fillna("").astype(str)
 
 today_str = datetime.now().strftime("%Y-%m-%d")
 
-st.sidebar.header("✍️ 記錄新資料")
-record_type = st.sidebar.radio("請選擇輸入類型：", ["🌟 恩典與體會日記", "📅 未來事奉人手排班"])
+st.sidebar.header(dec("4pyoIOiom記録5paw6LOH5paZ"))
+r_type_sel = st.sidebar.radio(dec("6KuL6YG45p9Y6Ly45YWl6aGe5Z6LDQo="), ["G_DIARY", "S_PLAN", "R_BORROW"])
 
-with st.sidebar.form(key="grace_form", clear_on_submit=False):
-    service_date = st.date_input("事奉日期", datetime.now())
+with st.sidebar.form(key="f_main", clear_on_submit=False):
+    s_date = st.date_input(dec("5L9Y55So5pel5pyf"), datetime.now())
+    t_in = st.time_input(dec("6ZaL5aeL5pmC6ZaT"), time(9, 30))
+    t_str = t_in.strftime("%H:%M")
     
-    # 🌟 新增：精準時間選擇器
-    t_input = st.time_input("事奉開始時間", time(9, 30))
-    time_str = t_input.strftime("%H:%M")
-    
-    role = st.selectbox("事奉崗位", roles_list)
-    content = st.text_input("服侍時段或內容摘要", placeholder="例如：主日崇拜第一場、彩排演練...")
-    
-    selected_group = st.selectbox("選擇小組/團契名稱", groups_list)
-    custom_group = st.text_input("若選擇『其他』，請在此輸入新小組：", placeholder="例如：提摩太小組")
-    final_group = custom_group.strip() if (selected_group == "其他 / 請自行於下方輸入" and custom_group.strip()) else selected_group
-    
-    people = st.text_input("事奉人員 / 同行同工", placeholder="多名同工請用中文或英文逗號隔開")
-    
-    if record_type == "🌟 恩典與體會日記":
-        grace_notes = st.text_area("恩典與體會紀錄", placeholder="寫下神在這次服侍中給您的感動或學習...", height=150)
+    if r_type_sel == "R_BORROW":
+        f_room = st.text_input(dec("6Yg45p6p6IiH6Ly45YWl5oi/6ZaT5ZCN56ix"), "101")
+        role_val = "場地借用"
+        f_group = st.text_input(dec("5Y借55So5bI+6Z2S"), "David")
+        f_content = st.text_input(dec("5Y借55So55So6YCU5p6p6KaB"), "Meeting")
+        f_people = st.text_input(dec("6ZOf6LOg6Y借55So5ZCM5bel"), "User")
+        f_notes = st.text_area(dec("6Y借55So6備6Ki7"), "", height=100)
     else:
-        grace_notes = st.text_area("備註事項 (選填)", placeholder="例如：當天需提前30分鐘到場...", height=100)
+        f_room = ""
+        role_val = st.selectbox(dec("5LqL5aWp5b岗5L9Y"), roles_list_real)
+        f_content = st.text_input(dec("5pyN5L9Y5pmC6Z615oi05YWn5a655p6p6KaB"), "")
+        f_group = st.text_input(dec("6YG45p6p5bI+6Z2S56ix56ix"), "David")
+        f_people = st.text_input(dec("5LqL5aWp5Lq65ZOhIC8g5ZCM6KGM5ZCM5bel"), "")
+        f_notes = st.text_area(dec("5oSf5YuV6IiH6auU5pyD6Ki76YCB"), "", height=150)
         
-    submit_button = st.form_submit_button(label="儲存至雲端")
+    sub_b = st.form_submit_button(dec("5YS儲5a2Y6Iez6Zuy6duv"))
 
-def save_to_supabase(d_str, t_str, r_str, c_str, g_str, p_str, n_str, type_str):
-    insert_data = {
-        "service_date": d_str,
-        "service_time": t_str,
-        "role": r_str,
-        "content": c_str,
-        "group_name": g_str,
-        "people": p_str,
-        "grace_notes": n_str,
-        "record_type": type_str
-    }
+def save_data(d, t, r, c, g, p, n, ty, rm):
     try:
-        supabase.table("service_records").insert(insert_data).execute()
-        st.success(f"🎉 成功儲存一筆【{type_str}】資料！網頁即將重新整理...")
-        st.balloons()
+        supabase.table("service_records").insert({"service_date":d,"service_time":t,"role":r,"content":c,"group_name":g,"people":p,"grace_notes":n,"record_type":ty,"room_name":rm}).execute()
+        st.success("SAVED SUCCESS!")
         st.session_state.clear()
-        import time as t_mod
-        t_mod.sleep(1.5)
+        import time as tm
+        tm.sleep(1.0)
         st.rerun()
-    except Exception as save_err:
-        st.error(f"❌ 儲存失敗：{save_err}")
+    except Exception as err:
+        st.error(f"Save failed: {err}")
 
-if submit_button:
-    if record_type == "🌟 恩典與體會日記" and not grace_notes:
-        st.sidebar.error("❌ 記錄日記請務必填寫『恩典與體會紀錄』！")
-    else:
-        date_str = service_date.strftime("%Y-%m-%d")
-        type_db = "恩典日記" if record_type == "🌟 恩典與體會日記" else "事奉排班"
-        
-        conflict_detected = False
-        conflict_msg = []
-        
-        # 🌟 精準時間防重覆核心檢查
-        if not df_raw.empty and type_db == "事奉排班":
-            # 1. 檢查【同一天】+【同時間】+【同崗位】是否重覆
-            same_time_role = df_raw[(df_raw["service_date"] == date_str) & (df_raw["service_time"] == time_str) & (df_raw["role"] == role) & (df_raw["record_type"] == "事奉排班")]
-            if not same_time_role.empty:
-                conflict_detected = True
-                conflict_msg.append(f"⚠️ 崗位時間重覆：【{date_str} {time_str}】的【{role}】已排班給：{same_time_role['people'].values}")
-            
-            # 2. 檢查【同一天】+【同時間】+【同人手姓名】是否重覆
-            if people.strip():
-                input_names = [n.strip() for n in people.replace("，", ",").split(",") if n.strip()]
-                day_time_records = df_raw[(df_raw["service_date"] == date_str) & (df_raw["service_time"] == time_str) & (df_raw["record_type"] == "事奉排班")]
-                
-                for name in input_names:
-                    for idx, row in day_time_records.iterrows():
-                        if name in row["people"]:
-                            conflict_detected = True
-                            conflict_msg.append(f"⚠️ 人手時間衝突：同工【{name}】在【{date_str} {time_str}】已有服侍【{row['role']}】")
-
-        if conflict_detected:
-            st.session_state["conflict_msgs"] = conflict_msg
-            st.session_state["pending_data"] = (date_str, time_str, role, content, final_group, people, grace_notes, type_db)
-        else:
-            save_to_supabase(date_str, time_str, role, content, final_group, people, grace_notes, type_db)
-
-if "conflict_msgs" in st.session_state:
-    st.error("🚨 偵測到同工時間或崗位排班衝突！請確認下方資訊：")
-    for msg in st.session_state["conflict_msgs"]:
-        st.warning(msg)
+if sub_b:
+    d_str = s_date.strftime("%Y-%m-%d")
+    db_ty = "恩典日記" if r_type_sel == "G_DIARY" else ("事奉排班" if r_type_sel == "S_PLAN" else "場地借用")
     
-    col_ok, col_no = st.columns(2)
-    with col_ok:
-        if st.button("👍 沒問題，仍要強行儲存", type="primary"):
-            p_date, p_time, p_role, p_content, p_group, p_people, p_notes, p_type = st.session_state["pending_data"]
-            save_to_supabase(p_date, p_time, p_role, p_content, p_group, p_people, p_notes, p_type)
-    with col_no:
-        if st.button("❌ 取消並重新修改"):
+    warn_flag = False
+    w_msg = []
+    
+    if not df_raw.empty:
+        if db_ty == "事奉排班":
+            chk1 = df_raw[(df_raw["service_date"]==d_str) & (df_raw["service_time"]==t_str) & (df_raw["role"]==role_val) & (df_raw["record_type"]=="事奉排班")]
+            if not chk1.empty:
+                warn_flag = True
+                w_msg.append(f"CONFLICT: ROLE TAKEN AT {d_str} {t_str}")
+            if f_people.strip():
+                p_arr = [x.strip() for x in f_people.replace("，",",").split(",") if x.strip()]
+                chk2 = df_raw[(df_raw["service_date"]==d_str) & (df_raw["service_time"]==t_str) & (df_raw["record_type"]=="事奉排班")]
+                for nm in p_arr:
+                    for idx, row in chk2.iterrows():
+                        if nm in row["people"]:
+                            warn_flag = True
+                            w_msg.append(f"CONFLICT: USER {nm} BUSY AT {d_str} {t_str}")
+        elif db_ty == "場地借用":
+            chk3 = df_raw[(df_raw["service_date"]==d_str) & (df_raw["service_time"]==t_str) & (df_raw["room_name"]==f_room) & (df_raw["record_type"]=="場地借用")]
+            if not chk3.empty:
+                warn_flag = True
+                w_msg.append(f"CONFLICT: ROOM {f_room} OCCUPIED AT {d_str} {t_str}")
+
+    if warn_flag:
+        st.session_state["w"] = w_msg
+        st.session_state["p"] = (d_str, t_str, role_val, f_content, f_group, f_people, f_notes, db_ty, f_room)
+    else:
+        save_data(d_str, t_str, role_val, f_content, f_group, f_people, f_notes, db_ty, f_room)
+
+if "w" in st.session_state:
+    st.error("🚨 DUPLICATE DETECTED:")
+    for m in st.session_state["w"]:
+        st.warning(m)
+    c_ok, c_no = st.columns(2)
+    with c_ok:
+        if st.button("FORCE SAVE", type="primary"):
+            pd1, pd2, pd3, pd4, pd5, pd6, pd7, pd8, pd9 = st.session_state["p"]
+            save_data(pd1, pd2, pd3, pd4, pd5, pd6, pd7, pd8, pd9)
+    with c_no:
+        if st.button("CANCEL"):
             st.session_state.clear()
             st.rerun()
 
-tab1, tab2 = st.tabs(["📅 未來事奉人手時間表", "📜 歷史恩典紀錄與數算"])
+t_a, t_b, t_c = st.tabs(["S_SCHEDULE", "R_STATUS", "G_NOTES"])
 
-with tab1:
-    st.subheader("🗓️ 近期及未來事奉排班預告")
-    st.caption("系統會依日期與時間排序，自動顯示今日以後的行程。")
-    
+with t_a:
+    st.subheader(dec("7p6m5pyf5Y+K5pyf5L6G5LqL5aWp5o6S54re"))
     if df_raw.empty:
-        st.info("目前雲端尚無任何事奉排班資料。")
+        st.info("No data.")
     else:
-        df_schedule = df_raw[(df_raw["record_type"] == "事奉排班") & (df_raw["service_date"] >= today_str)].copy()
-        df_schedule = df_schedule.sort_values(by=["service_date", "service_time"], ascending=True)
-        
-        search_sched = st.text_input("🔍 搜尋時間表 (支援大小寫、日子、小組或人名)", placeholder="例如：09:30、張弟兄、敬拜隊...")
-        if search_sched:
-            k = search_sched.strip()
-            df_schedule = df_schedule[
-                df_schedule["service_date"].str.contains(k, case=False) |
-                df_schedule["service_time"].str.contains(k, case=False) |
-                df_schedule["role"].str.contains(k, case=False) |
-                df_schedule["group_name"].str.contains(k, case=False) |
-                df_schedule["people"].str.contains(k, case=False) |
-                df_schedule["content"].str.contains(k, case=False)
-            ]
-            
-        if df_schedule.empty:
-            st.warning("查無符合條件的未來事奉排班行程。")
-        else:
-            df_sched_disp = df_schedule.rename(columns={"service_date": "事奉日期", "service_time": "開始時間", "role": "事奉崗位", "content": "服侍時段", "group_name": "事奉小組", "people": "事奉人員/同工", "grace_notes": "備註事項"})
-            st.dataframe(df_sched_disp[["事奉日期", "開始時間", "事奉崗位", "事奉小組", "服侍時段", "事奉人員/同工", "備註事項"]], use_container_width=True)
+        df_s = df_raw[(df_raw["record_type"] == "事奉排班") & (df_raw["service_date"] >= today_str)].copy().sort_values(by=["service_date", "service_time"])
+        q_s = st.text_input("Search Schedule:", placeholder="Type to filter...")
+        if q_s:
+            df_s = df_s[df_s["service_date"].str.contains(q_s,case=False)|df_s["service_time"].str.contains(q_s,case=False)|df_s["role"].str.contains(q_s,case=False)|df_s["people"].str.contains(q_s,case=False)]
+        st.dataframe(df_s, use_container_width=True)
 
-with tab2:
-    st.subheader("🔍 數算與查詢恩典日記")
+with t_b:
+    st.subheader(dec("6Yg45p6p6IiH6Ly45YWl5oi/6ZaT5ZCN56ix"))
     if df_raw.empty:
-        st.info("目前雲端尚無任何恩典紀錄。")
+        st.info("No data.")
     else:
-        df_grace = df_raw[df_raw["record_type"] == "恩典日記"].copy().sort_values(by=["service_date", "service_time"], ascending=False)
-        col1, col2 = st.columns(2)
-        with col1:
-            search_universal = st.text_input("🔍 全方位萬用搜尋 (支援大小寫、時間、日子、感動文字)", placeholder="可輸入：10:00、人名、小組...")
-        with col2:
-            search_role = st.selectbox("🏷️ 篩選事奉崗位", ["全部"] + roles_list)
-            
-        if search_role != "全部":
-            df_grace = df_grace[df_grace["role"] == search_role]
-        if search_universal:
-            keyword = search_universal.strip()
-            df_grace = df_grace[
-                df_grace["service_date"].str.contains(keyword, case=False) |
-                df_grace["service_time"].str.contains(keyword, case=False) |
-                df_grace["content"].str.contains(keyword, case=False) | 
-                df_grace["grace_notes"].str.contains(keyword, case=False) | 
-                df_grace["people"].str.contains(keyword, case=False) | 
-                df_grace["group_name"].str.contains(keyword, case=False)
-            ]
-            
-        if df_grace.empty:
-            st.warning("查無符合篩選條件的恩典日記。")
-        else:
-            df_grace_disp = df_grace.rename(columns={"service_date": "事奉日期", "service_time": "事奉時間", "role": "事奉崗位", "content": "服侍內容", "group_name": "所屬小組/團契", "people": "同行同工/人名", "grace_notes": "恩典與體會"})
-            
-            st.dataframe(df_grace_disp[["事奉日期", "事奉時間", "事奉崗位", "所屬小組/團契", "服侍內容", "同行同工/人名", "恩典與體會"]], use_container_width=True)
-            st.markdown("---")
-            st.subheader("📖 恩典詳細閱讀器")
-            
-            selected_key = st.selectbox("選擇要細細品味的紀錄：", df_grace_disp.index, format_func=lambda x: f"{df_grace_disp.loc[x, '事奉日期']} {df_grace_disp.loc[x, '事奉時間']} - 【{df_grace_disp.loc[x, '事奉崗位']}】 {str(df_grace_disp.loc[x, '服侍內容'])[:15]}...")
-            if selected_key is not None:
-                final_row = df_grace_disp.loc[selected_key]
-                st.info(f"📅 日期時間：{final_row['事奉日期']} {final_row['事奉時間']} | 🏷️ 崗位：{final_row['事奉崗位']} | 🏘️ 小組：{final_row['所屬小組/團契']}")
-                st.write(f"👤 同行同工：{final_row['同行同工/人名']}")
-                st.write(f"📋 服侍摘要：{final_row['服侍內容']}")
-                st.write("🕊️ 恩典與體會日記：")
+        df_r = df_raw[(df_raw["record_type"] == "場地借用") & (df_raw["service_date"] >= today_str)].copy().sort_values(by=["service_date", "service_time"])
+        q_r = st.text_input("Search Rooms:", placeholder="Type to filter...")
+        if q_r:
+            df_r = df_r[df_r["service_date"].str.contains(q_r,case=False)|df_r["room_name"].str.contains(q_r,case=False)|df_r["group_name"].str.contains(q_r,case=False)]
+        st.dataframe(df_r, use_container_width=True)
+
+with t_c:
+    st.subheader(dec("6Zyy566X6IiH6bOl6ecv5byP5oGp5YW46Ki76YCB"))
+    if df_raw.empty:
+        st.info("No data.")
+    else:
+        df_g = df_raw[df_raw["record_type"] == "恩典日記"].copy().sort_values(by=["service_date", "service_time"], ascending=False)
+        q_g = st.text_input("Search Grace Notes:", placeholder="Type to filter...")
+        if q_g:
+            df_g = df_g[df_g["service_date"].str.contains(q_g,case=False)|df_g["grace_notes"].str.contains(q_g,case=False)|df_g["people"].str.contains(q_g,case=False)]
+        st.dataframe(df_g, use_container_width=True)
+        st.markdown("---")
+        idx_sel = st.selectbox("Select row to view detail:", df_g.index)
+        if idx_sel is not None:
+            f_r = df_g.loc[idx_sel]
+            st.info(f"DATE: {f_r['service_date']} {f_r['service_time']} | ROLE: {f_r['role']} | GROUP: {f_r['group_name']}")
+            st.write(f"PEOPLE: {f_r['people']}")
+            st.write(f"SUMMARY: {f_r['content']}")
+            st.info(str(f_r['grace_notes']))

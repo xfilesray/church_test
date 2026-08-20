@@ -1,16 +1,3 @@
-出現這個報錯（`SyntaxError: invalid character '（'`）的原因是：在複製代碼時，**不小心把解說的中文文字貼到了 `app.py` 檔案的第一行**。
-
-Python 檔案（`.py`）只能包含合法的程式碼或用 `#` 開頭的註解。如果檔案開頭直接出現中文說明文字，Python 就會跳出語法錯誤（SyntaxError）。
-
----
-
-### 🔧 解決方法
-
-請開啟您的 `app.py` 檔案，**刪除第一行的中文說明文字**，確保檔案從 `import constants as c` 開始，或者直接用下方完整的純程式碼覆蓋 `app.py`：
-
-📄 **正確的完整 `app.py` 內容**：
-
-```python
 import constants as c
 from datetime import datetime, time
 import pandas as pd
@@ -381,5 +368,3 @@ elif selected_tab == c.TABS[2]:
                 st.write(f"Companions: {f_row['同行同工']}")
                 st.write(f"Summary: {f_row['摘要']}")
                 st.success(str(f_row["恩典體會"]))
-
-```

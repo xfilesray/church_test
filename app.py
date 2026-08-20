@@ -270,6 +270,17 @@ st.markdown("---")
 
 today_str = datetime.now().strftime("%Y-%m-%d")
 
+# 全欄位搜尋函式
+def filter_all_columns(df, query):
+    if not query:
+        return df
+    # 檢查每一行的所有欄位，只要有任何一個欄位包含搜尋關鍵字即保留
+    mask = df.astype(str).apply(
+        lambda row: row.str.contains(query, case=False, na=False).any(), axis=1
+    )
+    return df[mask]
+
+
 # 分頁 1: 未來事奉排班
 if selected_tab == c.TABS[0]:
     st.subheader(c.TABS[0])
@@ -284,19 +295,17 @@ if selected_tab == c.TABS[0]:
             .copy()
             .sort_values(by=["service_date", "service_time"])
         )
-        q_s = st.text_input("🔍 搜尋事奉排班：", placeholder="輸入日期、崗位或同工姓名搜尋...")
+        
+        # 重新命名欄位以便呈現與搜尋
+        df_s_disp = df_s.rename(columns=c.DF_COL_MAP_SCHEDULE)[
+            list(c.DF_COL_MAP_SCHEDULE.values())
+        ]
+        
+        q_s = st.text_input("🔍 搜尋事奉排班（可搜尋所有欄位）：", placeholder="輸入任意關鍵字（日期、崗位、姓名、備註...）")
         if q_s:
-            df_s = df_s[
-                df_s["service_date"].str.contains(q_s, case=False)
-                | df_s["role"].str.contains(q_s, case=False)
-                | df_s["people"].str.contains(q_s, case=False)
-            ]
+            df_s_disp = filter_all_columns(df_s_disp, q_s)
 
-        df_s_disp = df_s.rename(columns=c.DF_COL_MAP_SCHEDULE)
-        st.dataframe(
-            df_s_disp[list(c.DF_COL_MAP_SCHEDULE.values())],
-            use_container_width=True,
-        )
+        st.dataframe(df_s_disp, use_container_width=True)
 
 # 分頁 2: 場地借用管理
 elif selected_tab == c.TABS[1]:
@@ -312,19 +321,16 @@ elif selected_tab == c.TABS[1]:
             .copy()
             .sort_values(by=["service_date", "service_time"])
         )
-        q_r = st.text_input("🔍 搜尋場地預約：", placeholder="輸入日期、場地名稱或小組搜尋...")
+        
+        df_r_disp = df_r.rename(columns=c.DF_COL_MAP_ROOMS)[
+            list(c.DF_COL_MAP_ROOMS.values())
+        ]
+        
+        q_r = st.text_input("🔍 搜尋場地預約（可搜尋所有欄位）：", placeholder="輸入任意關鍵字（日期、場地、小組、負責人...）")
         if q_r:
-            df_r = df_r[
-                df_r["service_date"].str.contains(q_r, case=False)
-                | df_r["room_name"].str.contains(q_r, case=False)
-                | df_r["group_name"].str.contains(q_r, case=False)
-            ]
+            df_r_disp = filter_all_columns(df_r_disp, q_r)
 
-        df_r_disp = df_r.rename(columns=c.DF_COL_MAP_ROOMS)
-        st.dataframe(
-            df_r_disp[list(c.DF_COL_MAP_ROOMS.values())],
-            use_container_width=True,
-        )
+        st.dataframe(df_r_disp, use_container_width=True)
 
 # 分頁 3: 恩典體會日記
 elif selected_tab == c.TABS[2]:
@@ -337,21 +343,16 @@ elif selected_tab == c.TABS[2]:
             .copy()
             .sort_values(by="service_date", ascending=False)
         )
-        q_g = st.text_input(
-            "🔍 全域搜尋恩典日記：", placeholder="輸入關鍵字、同行同工或心得內容搜尋..."
-        )
+        
+        df_g_disp = df_g.rename(columns=c.DF_COL_MAP_DIARY)[
+            list(c.DF_COL_MAP_DIARY.values())
+        ]
+        
+        q_g = st.text_input("🔍 搜尋恩典日記（可搜尋所有欄位）：", placeholder="輸入任意關鍵字（日期、同工、心得、摘要...）")
         if q_g:
-            df_g = df_g[
-                df_g["service_date"].str.contains(q_g, case=False)
-                | df_g["grace_notes"].str.contains(q_g, case=False)
-                | df_g["people"].str.contains(q_g, case=False)
-            ]
+            df_g_disp = filter_all_columns(df_g_disp, q_g)
 
-        df_g_disp = df_g.rename(columns=c.DF_COL_MAP_DIARY)
-        st.dataframe(
-            df_g_disp[list(c.DF_COL_MAP_DIARY.values())],
-            use_container_width=True,
-        )
+        st.dataframe(df_g_disp, use_container_width=True)
         st.markdown("---")
 
         if not df_g_disp.empty:

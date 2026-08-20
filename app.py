@@ -9,22 +9,23 @@ st.set_page_config(
     page_icon="⛪",
     layout="wide"
 )
-
-# 從 Streamlit Secrets 或本地環境安全讀取雲端連線資訊
-try:
+# 從 Streamlit Secrets 讀取雲端連線資訊
+# 如果找不到 Secrets，則主動從網頁畫面上提示，避免程式直接崩潰
+if "SUPABASE_URL" in st.secrets and "SUPABASE_KEY" in st.secrets:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-except Exception:
-    # 本地測試時若未設定 Secrets 的備用提示
-    SUPABASE_URL = "請在此處貼上您的_SUPABASE_URL"
-    SUPABASE_KEY = "請在此處貼上您的_SUPABASE_KEY"
+    
+    # 初始化 Supabase 雲端客戶端
+    @st.cache_resource
+    def get_supabase_client() -> Client:
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
+    
+    supabase = get_supabase_client()
+else:
+    st.error("⚠️ 未偵測到雲端資料庫設定！")
+    st.info("💡 請前往 Streamlit Cloud 的 Settings -> Secrets 中貼入您的 SUPABASE_URL 與 SUPABASE_KEY。")
+    st.stop() # 停止執行後續程式，避免拋出 Invalid URL 錯誤
 
-# 初始化 Supabase 雲端客戶端
-@st.cache_resource
-def get_supabase_client() -> Client:
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
-
-supabase = get_supabase_client()
 
 # 應用程式標題
 st.title("⛪ 個人教會事奉恩典紀錄及查詢系統 (雲端永久版)")

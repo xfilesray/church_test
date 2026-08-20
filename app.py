@@ -90,11 +90,11 @@ if submit_button:
 # 主頁面：查詢與數算恩典
 st.header("🔍 數算與查詢恩典")
 
-# 🔍 簡化後的搜尋與篩選控制區（只保留一個關鍵字輸入框與一個崗位選單）
-col1, col2 = st.columns([3, 1]) # 設定比例讓搜尋框更寬
+# 🔍 搜尋與篩選控制區
+col1, col2 = st.columns([3, 1])
 with col1:
-    # 🌟 核心修改：單一萬用關鍵字搜尋框
-    search_universal = st.text_input("🔍 全方位萬用搜尋", placeholder="可以輸入任何人名、小組名稱、服侍摘要或感動文字...")
+    # 🌟 萬用搜尋框提示文字更新，加入日期與大小寫說明
+    search_universal = st.text_input("🔍 全方位萬用搜尋 (支援不限大小寫英文字、日期片段)", placeholder="可輸入：人名、小組、事奉日子(如 2026 或 -08-)、摘要或感動文字...")
 with col2:
     search_role = st.selectbox("🏷️ 篩選事奉崗位", ["全部"] + roles_list)
 
@@ -111,24 +111,26 @@ if df_raw.empty:
 else:
     df = df_raw.copy()
     
-    # 填補空值避免篩選時報錯
-    df["group_name"] = df["group_name"].fillna("")
-    df["people"] = df["people"].fillna("")
-    df["content"] = df["content"].fillna("")
-    df["grace_notes"] = df["grace_notes"].fillna("")
+    # 填補空值並轉為字串，確保篩選不報錯
+    df["service_date"] = df["service_date"].fillna("").astype(str)
+    df["group_name"] = df["group_name"].fillna("").astype(str)
+    df["people"] = df["people"].fillna("").astype(str)
+    df["content"] = df["content"].fillna("").astype(str)
+    df["grace_notes"] = df["grace_notes"].fillna("").astype(str)
     
-    # 進行前端多條件篩選
+    # 進行前端事奉崗位篩選
     if search_role != "全部":
         df = df[df["role"] == search_role]
         
     if search_universal:
-        # 🌟 核心修改：一個關鍵字同時對比四個欄位 (OR 邏輯)
         keyword = search_universal.strip()
+        # 🌟 核心修改：使用 case=False 實現不限大小寫搜尋，並加入 df["service_date"] 支援日子搜尋
         df = df[
-            df["content"].str.contains(keyword, na=False) | 
-            df["grace_notes"].str.contains(keyword, na=False) | 
-            df["people"].str.contains(keyword, na=False) | 
-            df["group_name"].str.contains(keyword, na=False)
+            df["service_date"].str.contains(keyword, case=False, na=False) |
+            df["content"].str.contains(keyword, case=False, na=False) | 
+            df["grace_notes"].str.contains(keyword, case=False, na=False) | 
+            df["people"].str.contains(keyword, case=False, na=False) | 
+            df["group_name"].str.contains(keyword, case=False, na=False)
         ]
 
     # 重新命名欄位供前端顯示

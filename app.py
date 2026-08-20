@@ -52,6 +52,26 @@ groups_list = [
     "其他 / 請自行於下方輸入"
 ]
 
+# 從 Supabase 撈取所有原始資料
+try:
+    response = supabase.table("service_records").select("service_date, role, content, group_name, people, grace_notes, record_type").order("service_date", desc=False).execute()
+    df_raw = pd.DataFrame(response.data)
+except Exception as e:
+    st.error(f"雲端資料讀取失敗：{e}")
+    df_raw = pd.DataFrame()
+
+# 填補空值
+if not df_raw.empty:
+    df_raw["record_type"] = df_raw["record_type"].fillna("恩典日記")
+    df_raw["service_date"] = df_raw["service_date"].fillna("").astype(str)
+    df_raw["role"] = df_raw["role"].fillna("").astype(str)
+    df_raw["group_name"] = df_raw["group_name"].fillna("").astype(str)
+    df_raw["people"] = df_raw["people"].fillna("").astype(str)
+    df_raw["content"] = df_raw["content"].fillna("").astype(str)
+    df_raw["grace_notes"] = df_raw["grace_notes"].fillna("").astype(str)
+
+today_str = datetime.now().strftime("%Y-%m-%d")
+
 # ========================================================
 # 🌟 側邊欄：輸入區（支援切換「恩典日記」與「事奉排班」）
 # ========================================================
@@ -67,16 +87,16 @@ with st.sidebar.form(key="grace_form", clear_on_submit=True):
     custom_group = st.text_input("若選擇『其他』，請在此輸入新小組：", placeholder="例如：提摩太小組")
     final_group = custom_group.strip() if (selected_group == "其他 / 請自行於下方輸入" and custom_group.strip()) else selected_group
     
-    people = st.text_input("事奉人員 / 同行同工", placeholder="例如：張弟兄、李姊妹（多名用逗號隔開）")
+    people = st.text_input("事奉人員 / 同行同工", placeholder="例如：張弟兄, 李姊妹 (多名請用半形逗號隔開)")
     
-    # 根據類型動態調整填寫提示
     if record_type == "🌟 恩典與體會日記":
         grace_notes = st.text_area("恩典與體會紀錄", placeholder="寫下神在這次服侍中給您的感動或學習...", height=150)
     else:
-        grace_notes = st.text_area("備註事項 (選填)", placeholder="例如：當天需提前30分鐘到場練唱、需準備投影片...", height=100)
+        grace_notes = st.text_area("備註事項 (選填)", placeholder="例如：當天需提前30分鐘到場...", height=100)
         
     submit_button = st.form_submit_button(label="儲存至雲端")
 
+# 智慧防重覆檢查邏輯
 if submit_button:
     if record_type == "🌟 恩典與體會日記" and not grace_notes:
         st.sidebar.error("❌ 記錄日記請務必填寫『恩典與體會紀錄』！")
@@ -84,6 +104,29 @@ if submit_button:
         date_str = service_date.strftime("%Y-%m-%d")
         type_db = "恩典日記" if record_type == "🌟 恩典與體會日記" else "事奉排班"
         
+        conflict_detected = False
+        conflict_msg = []
+        
+        if not df_raw.empty and type_db == "事奉排班":
+            same_role = df_raw[(df_raw["service_date"] == date_str) & (df_raw["role"] == role) & (df_raw["record_type"] == "事奉排班")]
+            if not same_role.empty:
+                conflict_detected = True
+                conflict_msg.append(f"⚠️ 警告：【{date_str}】的【{role}】崗位已被排班給：{same_role['people'].values}")
+            
+            if people.strip():
+                input_names = [n.strip() for n in people.replace("，", ",").split(",") if n.strip()]
+                day_records = df_raw[(df_raw["service_date"] == date_str) & (df_raw["record_type"] == "事奉排班")]
+                
+                for name in input_names:
+                    for idx, row in day_records.iterrows():
+                        if name in row["people"]:
+                            conflict_detected = True
+                            conflict_msg.append(f"⚠️ 警告：同工【{name}】在【{date_str}】已有服侍：【{row['role']}】({row['content']})")
+
+        if conflict_detected:
+            for msg in conflict_msg:
+                st.warning(msg)
+                
         data = {
             "service_date": date_str,
             "role": role,
@@ -95,9 +138,10 @@ if submit_button:
         }
         try:
             supabase.table("service_records").insert(data).execute()
-            st.sidebar.success(f"🎉 成功同步一筆【{type_db}】至雲端資料庫！")
+            st.sidebar.success(f"🎉 成功同步一筆【{type_db}】至雲端！")
+            st.rerun()
         except Exception as e:
-            st.sidebar.error(f"❌ 儲存失敗，請檢查連線：{e}")
+            st.sidebar.error(f"❌ 儲存失敗：{e}")
 
 
 # ========================================================
@@ -105,40 +149,19 @@ if submit_button:
 # ========================================================
 tab1, tab2 = st.tabs(["📅 未來事奉人手時間表", "📜 歷史恩典紀錄與數算"])
 
-# 從 Supabase 撈取所有原始資料
-try:
-    response = supabase.table("service_records").select("service_date, role, content, group_name, people, grace_notes, record_type").order("service_date", desc=False).execute()
-    df_raw = pd.DataFrame(response.data)
-except Exception as e:
-    st.error(f"雲端資料讀取失敗：{e}")
-    df_raw = pd.DataFrame()
-
-# 填補空值避免後續計算出錯
-if not df_raw.empty:
-    df_raw["record_type"] = df_raw["record_type"].fillna("恩典日記")
-    df_raw["service_date"] = df_raw["service_date"].fillna("").astype(str)
-    df_raw["group_name"] = df_raw["group_name"].fillna("").astype(str)
-    df_raw["people"] = df_raw["people"].fillna("").astype(str)
-    df_raw["content"] = df_raw["content"].fillna("").astype(str)
-    df_raw["grace_notes"] = df_raw["grace_notes"].fillna("").astype(str)
-
-today_str = datetime.now().strftime("%Y-%m-%d")
-
 # --------------------------------------------------------
 # 頁籤一：📅 未來事奉人手時間表
 # --------------------------------------------------------
 with tab1:
     st.subheader("🗓️ 近期及未來事奉排班預告")
-    st.caption("系統會自動篩選出今日（含）以後的事奉行程，方便同工對表與預備心。")
+    st.caption("系統會自動篩選出今日（含）以後的事奉行程，方便同工對表。")
     
     if df_raw.empty:
         st.info("目前雲端尚無任何事奉排班資料。")
     else:
-        # 篩選出「事奉排班」類型，且日期大於等於今天的行程
         df_schedule = df_raw[(df_raw["record_type"] == "事奉排班") & (df_raw["service_date"] >= today_str)].copy()
         
-        # 萬用搜尋框（時間表專用）
-        search_sched = st.text_input("🔍 搜尋時間表 (可輸入人名、小組、崗位或日子)", placeholder="例如輸入：張弟兄、敬拜隊、2026-08...")
+        search_sched = st.text_input("🔍 搜尋時間表 (支援不限大小寫英文字、日期片段)", placeholder="例如輸入：張弟兄、敬拜隊、2026-08...")
         if search_sched:
             k = search_sched.strip()
             df_schedule = df_schedule[
@@ -152,19 +175,17 @@ with tab1:
         if df_schedule.empty:
             st.warning("查無符合條件的未來事奉排班行程。")
         else:
-            # 重新命名欄位
             df_sched_disp = df_schedule.rename(columns={
                 "service_date": "事奉日期",
                 "role": "事奉崗位",
                 "content": "服侍時段/摘要",
                 "group_name": "事奉小組/團契",
-                "people": "👤 事奉人員/同工",
+                "people": "事奉人員/同工",
                 "grace_notes": "備註事項"
             })
             
-            # 顯示簡明時間表表格
             st.dataframe(
-                df_sched_disp[["事奉日期", "事奉崗位", "事奉小組/團契", "服侍時段/摘要", "👤 事奉人員/同工", "備註事項"]],
+                df_sched_disp[["事奉日期", "事奉崗位", "事奉小組/團契", "服侍時段/摘要", "事奉人員/同工", "備註事項"]],
                 use_container_width=True
             )
 
@@ -177,13 +198,12 @@ with tab2:
     if df_raw.empty:
         st.info("目前雲端尚無任何恩典紀錄。")
     else:
-        # 篩選歷史日記（按日期降序，最新的在上面）
         df_grace = df_raw[df_raw["record_type"] == "恩典日記"].copy()
         df_grace = df_grace.sort_values(by="service_date", ascending=False)
         
         col1, col2 = st.columns(2)
         with col1:
-            search_universal = st.text_input("🔍 萬用關鍵字搜尋恩典紀錄", placeholder="可輸入：人名、小組、日子(如-08-)、感動文字...")
+            search_universal = st.text_input("🔍 全方位萬用搜尋 (支援不限大小寫英文字、日期片段)", placeholder="可輸入：人名、小組、日子、感動文字...")
         with col2:
             search_role = st.selectbox("🏷️ 篩選事奉崗位", ["全部"] + roles_list)
             
@@ -211,7 +231,6 @@ with tab2:
                 "grace_notes": "恩典與體會"
             })
             
-            # 統計
             total_services = len(df_grace_disp)
             unique_roles = df_grace_disp["事奉崗位"].nunique() if total_services > 0 else 0
             stat_col1, stat_col2 = st.columns(2)
@@ -219,25 +238,28 @@ with tab2:
             stat_col2.metric("投入崗位數", f"{unique_roles} 個")
             
             st.markdown("---")
-            # 歷史表格
+            
+            # 使用大寬度顯示歷史清單
             st.dataframe(
                 df_grace_disp[["事奉日期", "事奉崗位", "所屬小組/團契", "服侍內容", "同行同工/人名", "恩典與體會"]],
-                use_container_width=True,
-                column_config={"恩典與體會": st.column_config.TextColumn("恩典與體會", width="large")}
+                use_container_width=True
             )
             
-            # 詳細閱讀
             st.markdown("---")
             st.subheader("📖 恩典詳細閱讀器")
+            
             selected_index = st.selectbox(
                 "選擇要細細品味的紀錄：", 
                 df_grace_disp.index, 
                 format_func=lambda x: f"{df_grace_disp.loc[x, '事奉日期']} - 【{df_grace_disp.loc[x, '事奉崗位']}】 {str(df_grace_disp.loc[x, '服侍內容'])[:15]}..."
             )
+            
             if selected_index is not None:
-                row = df_grace_disp.loc[selected_index]
-                st.info(f"**📅 日期：** {row['事奉日期']}  |  **🏷️ 崗位：** {row['事奉崗位']}  |  **🏘️ 小組：** {row['所屬小組/團契']}")
-                st.write(f"**👤 同行同工：** {row['同行同工/人名']}")
-                st.write(f"**📋 服侍摘要：** {row['服侍內容']}")
-                st.write("**🕊️ 恩典與體會日記：**")
-                st.success(row['恩典與體會'])
+                # 🌟 核心修正：使用位置索引（iloc）精準抓取表格中的特定位置，程式碼內完全抹除容易出錯的字串
+                target_row = df_grace_disp.loc[selected_index]
+                st.info(f"**📅 日期：** {target_row.iloc[0]}  |  **🏷️ 崗位：** {target_row.iloc[1]}  |  **🏘️ 小組：** {target_row.iloc[2]}")
+                st.write(f"**👤 同行同工：** {target_row.iloc[4]}")
+                st.write(f"**📋 服侍摘要：** {target_row.iloc[3]}")
+                st.write("**🕊️ 恩典日記內文：**")
+                st.success(target_row.iloc[5])
+                # 這裡使用第 5 欄（恩典日記內文）進行顯示

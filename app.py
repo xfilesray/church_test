@@ -4,10 +4,10 @@ import pandas as pd
 import streamlit as st
 from supabase import Client, create_client
 
-# Page Config
+# 頁面配置
 st.set_page_config(page_title=c.PAGE_TITLE, page_icon="⛪", layout="wide")
 
-# Supabase Initialization
+# Supabase 初始化
 if "SUPABASE_URL" in st.secrets and "SUPABASE_KEY" in st.secrets:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -18,80 +18,80 @@ if "SUPABASE_URL" in st.secrets and "SUPABASE_KEY" in st.secrets:
 
     supabase = get_supabase_client()
 else:
-    st.error("Missing Secrets keys.")
+    st.error("缺少 Supabase 金鑰設定 (Secrets Missing)。")
     st.stop()
 
-# Initialize Active Tab State
+# 初始化頁籤狀態
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = c.TABS[0]
 
 st.title(c.MAIN_TITLE)
 st.markdown("---")
 
-# Sidebar - Form Setup
-st.sidebar.header("Form Input")
+# 側邊欄 - 資料輸入表單
+st.sidebar.header("📋 資料輸入表單")
 
 selected_type_key = st.sidebar.radio(
-    "Select Type:",
+    "請選擇紀錄類型：",
     c.RECORD_TYPE_KEYS,
     format_func=lambda x: c.RECORD_TYPE_MAP[x],
 )
 
 with st.sidebar.form(key="f_main", clear_on_submit=False):
-    s_date = st.date_input("Date", datetime.now())
-    t_in = st.time_input("Time", time(9, 30))
+    s_date = st.date_input("日期", datetime.now())
+    t_in = st.time_input("時間", time(9, 30))
     time_str = t_in.strftime("%H:%M")
 
-    # Common Field: Group Selection
-    sel_group = st.selectbox("Select Group", c.GROUPS)
+    # 通用欄位：選擇小組
+    sel_group = st.selectbox("請選擇小組/單位", c.GROUPS)
     if sel_group == c.OTHER_CUSTOM_TRIGGER:
         final_group = st.text_input(
-            "Custom Group Name", placeholder="Enter group name..."
+            "自訂小組/單位名稱", placeholder="請輸入小組名稱..."
         )
     else:
         final_group = sel_group
 
     if selected_type_key == "ROOMS":
-        sel_room = st.selectbox("Select Room", c.ROOMS)
+        sel_room = st.selectbox("請選擇場地/房間", c.ROOMS)
         if sel_room == c.OTHER_CUSTOM_TRIGGER:
             final_room = st.text_input(
-                "Custom Room Name", placeholder="Enter room name..."
+                "自訂場地/房間名稱", placeholder="請輸入場地名稱..."
             )
         else:
             final_room = sel_room
 
         role = "場地借用"
         content = st.text_input(
-            "Usage Summary", placeholder="e.g. Youth Choir Practice"
+            "使用用途摘要", placeholder="例如：青年詩班練習"
         )
-        people = st.text_input("Contact Person", placeholder="e.g. John Doe")
+        people = st.text_input("聯絡負責人", placeholder="例如：張小明")
         grace_notes = st.text_area(
-            "Notes", placeholder="Equipments / Memos...", height=100
+            "器材需求 / 備註", placeholder="需使用投影機、麥克風...", height=100
         )
 
     else:
         final_room = ""
-        sel_role = st.selectbox("Select Role", c.ROLES)
+        sel_role = st.selectbox("請選擇事奉崗位", c.ROLES)
         if sel_role == c.OTHER_CUSTOM_TRIGGER:
             role = st.text_input(
-                "Custom Role Name", placeholder="Enter role name..."
+                "自訂崗位名稱", placeholder="請輸入崗位名稱..."
             )
         else:
             role = sel_role
 
         content = st.text_input(
-            "Content Summary", placeholder="e.g. Sunday Worship"
+            "事奉/聚會內容摘要", placeholder="例如：主日敬拜聚會"
         )
         people = st.text_input(
-            "Staff Name(s)", placeholder="e.g. Mary, Peter (Comma separated)"
+            "事奉同工姓名", placeholder="例如：陳大衛, 林雅各（多位請用逗號分開）"
         )
         grace_notes = st.text_area(
-            "Grace Notes / Memo", placeholder="Write here...", height=150
+            "恩典體會 / 禱告事項 / 備註", placeholder="在此寫下服侍心得或禱告事項...", height=150
         )
 
-    submit_button = st.form_submit_button(label="Save to Cloud")
+    submit_button = st.form_submit_button(label="💾 儲存至雲端")
 
-# Fetch Cloud Data
+# 讀取雲端資料
 try:
     response = (
         supabase.table("service_records")
@@ -103,10 +103,10 @@ try:
     )
     df_raw = pd.DataFrame(response.data)
 except Exception as e:
-    st.error(f"Read Error: {e}")
+    st.error(f"讀取資料失敗：{e}")
     df_raw = pd.DataFrame()
 
-# Clean Dataframe
+# 資料清理與格式化
 if not df_raw.empty:
     df_raw["record_type"] = df_raw["record_type"].fillna("DIARY").astype(str)
     df_raw["service_date"] = df_raw["service_date"].fillna("").astype(str)
@@ -135,9 +135,9 @@ def save_to_supabase(
     }
     try:
         supabase.table("service_records").insert(insert_data).execute()
-        st.success("🎉 Data successfully saved!")
+        st.success("🎉 資料已成功儲存！")
 
-        # Dynamic Tab Switching based on saved type
+        # 自動切換分頁
         if type_str == "SCHEDULE":
             st.session_state["active_tab"] = c.TABS[0]
         elif type_str == "ROOMS":
@@ -153,17 +153,17 @@ def save_to_supabase(
         t_mod.sleep(0.8)
         st.rerun()
     except Exception as save_err:
-        st.error(f"Save failed: {save_err}")
+        st.error(f"儲存失敗：{save_err}")
 
 
-# Strict Duplicate & Conflict Checking Logic
+# 重複與撞期防錯檢查邏輯
 if submit_button:
     date_str = s_date.strftime("%Y-%m-%d")
     conflict_detected = False
     conflict_msg = []
 
     if not df_raw.empty:
-        # 1. Room Conflict Check
+        # 1. 場地撞期檢查
         if final_room.strip():
             same_room_time = df_raw[
                 (df_raw["service_date"] == date_str)
@@ -173,10 +173,10 @@ if submit_button:
             if not same_room_time.empty:
                 conflict_detected = True
                 conflict_msg.append(
-                    f"Conflict: Room [{final_room.strip()}] is already booked on {date_str} {time_str}"
+                    f"⚠️ 場地衝突：場地 [{final_room.strip()}] 在 {date_str} {time_str} 已被預約！"
                 )
 
-        # 2. Staff Conflict Check
+        # 2. 同工重複排班檢查
         if people.strip():
             input_names = [
                 n.strip()
@@ -197,10 +197,10 @@ if submit_button:
                     if name in existing_people:
                         conflict_detected = True
                         conflict_msg.append(
-                            f"Conflict: Staff [{name}] is already assigned/booked on {date_str} {time_str}"
+                            f"⚠️ 人員衝突：同工 [{name}] 在 {date_str} {time_str} 已有其他事奉/借用紀錄！"
                         )
 
-        # 3. Role Conflict Check
+        # 3. 事奉崗位重複檢查
         if selected_type_key == "SCHEDULE" and role.strip():
             same_time_role = df_raw[
                 (df_raw["service_date"] == date_str)
@@ -211,7 +211,7 @@ if submit_button:
             if not same_time_role.empty:
                 conflict_detected = True
                 conflict_msg.append(
-                    f"Conflict: Role [{role.strip()}] is already assigned on {date_str} {time_str}"
+                    f"⚠️ 崗位衝突：崗位 [{role.strip()}] 在 {date_str} {time_str} 已安排人員！"
                 )
 
     if conflict_detected:
@@ -240,23 +240,23 @@ if submit_button:
             final_room,
         )
 
-# Handle Conflict Modal / Alert Prompt
+# 衝突提示與強制儲存彈窗
 if "c_m" in st.session_state:
-    st.error("🚨 Booking Conflict Detected:")
+    st.error("🚨 偵測到預約/排班衝突：")
     for msg in st.session_state["c_m"]:
         st.warning(msg)
     col_ok, col_no = st.columns(2)
     with col_ok:
-        if st.button("Force Save", type="primary"):
+        if st.button("⚠️ 強制寫入/儲存", type="primary"):
             p1, p2, p3, p4, p5, p6, p7, p8, p9 = st.session_state["p_d"]
             save_to_supabase(p1, p2, p3, p4, p5, p6, p7, p8, p9)
     with col_no:
-        if st.button("Cancel"):
+        if st.button("❌ 取消"):
             st.session_state.pop("c_m", None)
             st.session_state.pop("p_d", None)
             st.rerun()
 
-# Main Display Controlled Tabs
+# 主展示區分頁控制
 selected_tab = st.radio(
     "",
     options=c.TABS,
@@ -270,11 +270,11 @@ st.markdown("---")
 
 today_str = datetime.now().strftime("%Y-%m-%d")
 
-# TAB 1: SCHEDULE
+# 分頁 1: 未來事奉排班
 if selected_tab == c.TABS[0]:
     st.subheader(c.TABS[0])
     if df_raw.empty:
-        st.info("No data available.")
+        st.info("目前尚無資料。")
     else:
         df_s = (
             df_raw[
@@ -284,7 +284,7 @@ if selected_tab == c.TABS[0]:
             .copy()
             .sort_values(by=["service_date", "service_time"])
         )
-        q_s = st.text_input("Search Schedule:", placeholder="Type keywords...")
+        q_s = st.text_input("🔍 搜尋事奉排班：", placeholder="輸入日期、崗位或同工姓名搜尋...")
         if q_s:
             df_s = df_s[
                 df_s["service_date"].str.contains(q_s, case=False)
@@ -298,11 +298,11 @@ if selected_tab == c.TABS[0]:
             use_container_width=True,
         )
 
-# TAB 2: ROOMS
+# 分頁 2: 場地借用管理
 elif selected_tab == c.TABS[1]:
     st.subheader(c.TABS[1])
     if df_raw.empty:
-        st.info("No data available.")
+        st.info("目前尚無資料。")
     else:
         df_r = (
             df_raw[
@@ -312,7 +312,7 @@ elif selected_tab == c.TABS[1]:
             .copy()
             .sort_values(by=["service_date", "service_time"])
         )
-        q_r = st.text_input("Search Rooms:", placeholder="Type keywords...")
+        q_r = st.text_input("🔍 搜尋場地預約：", placeholder="輸入日期、場地名稱或小組搜尋...")
         if q_r:
             df_r = df_r[
                 df_r["service_date"].str.contains(q_r, case=False)
@@ -326,11 +326,11 @@ elif selected_tab == c.TABS[1]:
             use_container_width=True,
         )
 
-# TAB 3: DIARY
+# 分頁 3: 恩典體會日記
 elif selected_tab == c.TABS[2]:
     st.subheader(c.TABS[2])
     if df_raw.empty:
-        st.info("No data available.")
+        st.info("目前尚無資料。")
     else:
         df_g = (
             df_raw[df_raw["record_type"] == "DIARY"]
@@ -338,7 +338,7 @@ elif selected_tab == c.TABS[2]:
             .sort_values(by="service_date", ascending=False)
         )
         q_g = st.text_input(
-            "Universal Search Diary:", placeholder="Type keywords..."
+            "🔍 全域搜尋恩典日記：", placeholder="輸入關鍵字、同行同工或心得內容搜尋..."
         )
         if q_g:
             df_g = df_g[
@@ -356,15 +356,15 @@ elif selected_tab == c.TABS[2]:
 
         if not df_g_disp.empty:
             selected_key = st.selectbox(
-                "Select record to view detail:",
+                "請選擇欲查看詳細內容的紀錄：",
                 df_g_disp.index,
                 format_func=lambda x: f"{df_g_disp.loc[x, '日期']} - {df_g_disp.loc[x, '崗位']}",
             )
             if selected_key is not None:
                 f_row = df_g_disp.loc[selected_key]
                 st.info(
-                    f"Details: {f_row['日期']} {f_row['時間']} | {f_row['崗位']} | {f_row['所屬小組']}"
+                    f"詳細資訊：{f_row['日期']} {f_row['時間']} | {f_row['崗位']} | {f_row['所屬小組']}"
                 )
-                st.write(f"Companions: {f_row['同行同工']}")
-                st.write(f"Summary: {f_row['摘要']}")
-                st.success(str(f_row["恩典體會"]))
+                st.write(f"同行同工：{f_row['同行同工']}")
+                st.write(f"事奉摘要：{f_row['摘要']}")
+                st.success(f"恩典體會：\n{f_row['恩典體會']}")

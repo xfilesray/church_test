@@ -48,7 +48,7 @@ today_str = datetime.now().strftime("%Y-%m-%d")
 st.sidebar.header("✍️ 記錄新資料")
 record_type = st.sidebar.radio("請選擇輸入類型：", ["🌟 恩典與體會日記", "📅 未來事奉人手排班"])
 
-with st.sidebar.form(key="grace_form", clear_on_submit=True):
+with st.sidebar.form(key="grace_form", clear_on_submit=False): # 🌟 改為 False 避免表單自動清空遺失狀態
     service_date = st.date_input("事奉日期", datetime.now())
     role = st.selectbox("事奉崗位", roles_list)
     content = st.text_input("服侍內容/時段摘要", placeholder="例如：主日崇拜第一場、上午 10:00")
@@ -66,6 +66,29 @@ with st.sidebar.form(key="grace_form", clear_on_submit=True):
         
     submit_button = st.form_submit_button(label="儲存至雲端")
 
+# 🌟 定義核心儲存函數
+def save_to_supabase(d_str, r_str, c_str, g_str, p_str, n_str, t_str):
+    insert_data = {
+        "service_date": d_str,
+        "role": r_str,
+        "content": c_str,
+        "group_name": g_str,
+        "people": p_str,
+        "grace_notes": n_str,
+        "record_type": t_str
+    }
+    try:
+        supabase.table("service_records").insert(insert_data).execute()
+        st.success(f"🎉 成功儲存一筆【{t_str}】資料！網頁即將重新整理...")
+        st.balloons() # 噴發慶祝氣球
+        st.session_state.clear() # 清除二階段狀態
+        import time
+        time.sleep(1.5)
+        st.rerun()
+    except Exception as save_err:
+        st.error(f"❌ 儲存失敗：{save_err}")
+
+# 🌟 二階段儲存與防重覆常駐檢查
 if submit_button:
     if record_type == "🌟 恩典與體會日記" and not grace_notes:
         st.sidebar.error("❌ 記錄日記請務必填寫『恩典與體會紀錄』！")
@@ -76,11 +99,12 @@ if submit_button:
         conflict_detected = False
         conflict_msg = []
         
+        # 僅在「事奉排班」時啟動重覆排班防禦
         if not df_raw.empty and type_db == "事奉排班":
             same_role = df_raw[(df_raw["service_date"] == date_str) & (df_raw["role"] == role) & (df_raw["record_type"] == "事奉排班")]
             if not same_role.empty:
                 conflict_detected = True
-                conflict_msg.append(f"⚠️ 崗位重覆：【{date_str}】的【{role}】已排班給 {same_role['people'].values}")
+                conflict_msg.append(f"⚠️ 崗位重覆：【{date_str}】的【{role}】已排班給：{same_role['people'].values[0]}")
             
             if people.strip():
                 input_names = [n.strip() for n in people.replace("，", ",").split(",") if n.strip()]
@@ -90,33 +114,39 @@ if submit_button:
                     for idx, row in day_records.iterrows():
                         if name in row["people"]:
                             conflict_detected = True
-                            conflict_msg.append(f"⚠️ 人手衝突：同工【{name}】在【{date_str}】已有服侍【{row['role']}】")
+                            conflict_msg.append(f"⚠️ 人手衝突：同工【{name}】在【{date_str}】已有服侍【{row['role']}】({row['content']})")
 
+        # 核心控制：若有衝突則暫停寫入，並將資料暫存在 session_state 中等待確認
         if conflict_detected:
-            for msg in conflict_msg:
-                st.warning(msg)
-                
-        data = {
-            "service_date": date_str,
-            "role": role,
-            "content": content,
-            "group_name": final_group,
-            "people": people,
-            "grace_notes": grace_notes,
-            "record_type": type_db
-        }
-        try:
-            supabase.table("service_records").insert(data).execute()
-            st.sidebar.success(f"🎉 成功儲存一筆【{type_db}】！")
-            st.rerun()
-        except Exception as e:
-            st.sidebar.error(f"❌ 儲存失敗：{e}")
+            st.session_state["conflict_msgs"] = conflict_msg
+            st.session_state["pending_data"] = (date_str, role, content, final_group, people, grace_notes, type_db)
+        else:
+            # 完全無重覆，直接秒速儲存
+            save_to_supabase(date_str, role, content, final_group, people, grace_notes, type_db)
 
+# 🌟 主動渲染常駐警告區（這段程式碼在頁面中央，只要狀態存在就會一直停留在畫面上）
+if "conflict_msgs" in st.session_state:
+    st.error("🚨 偵測到人手或時間排班衝突！請確認下方資訊：")
+    for msg in st.session_state["conflict_msgs"]:
+        st.warning(msg)
+    
+    col_ok, col_no = st.columns(2)
+    with col_ok:
+        # 使用不與表單綁定的獨立按鈕執行強行儲存
+        if st.button("👍 沒問題，仍要強行儲存", type="primary"):
+            p_date, p_role, p_content, p_group, p_people, p_notes, p_type = st.session_state["pending_data"]
+            save_to_supabase(p_date, p_role, p_content, p_group, p_people, p_notes, p_type)
+    with col_no:
+        if st.button("❌ 取消並重新修改"):
+            st.session_state.clear()
+            st.rerun()
+
+# 下方為原本的分頁顯示區（完全保留）
 tab1, tab2 = st.tabs(["📅 未來事奉人手時間表", "📜 歷史恩典紀錄與數算"])
 
 with tab1:
     st.subheader("🗓️ 近期及未來事奉排班預告")
-    st.caption("系統會自動篩選出今日（含）以後的事奉行程，並可進行重覆人手與時間檢查。")
+    st.caption("系統會自動篩選出今日（含）以後的事奉行程。")
     
     if df_raw.empty:
         st.info("目前雲端尚無任何事奉排班資料。")

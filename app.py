@@ -29,9 +29,7 @@ else:
 st.title("⛪ 個人教會事奉恩典紀錄及查詢系統 (雲端永久版)")
 st.markdown("---")
 
-# ==========================================
-# 💡 在這裡更新您的事奉崗位清單（可自由修改、增加或刪除）
-# ==========================================
+# 事奉崗位清單
 roles_list = [
     "敬拜隊/司琴", 
     "主日學/助教", 
@@ -48,10 +46,7 @@ roles_list = [
 st.sidebar.header("🌟 記錄新恩典")
 with st.sidebar.form(key="grace_form", clear_on_submit=True):
     service_date = st.date_input("事奉日期", datetime.now())
-    
-    # 這裡會自動讀取上面更新後的清單
     role = st.selectbox("事奉崗位", roles_list)
-    
     content = st.text_input("服侍內容摘要", placeholder="例如：主日崇拜司琴、帶領小組查經...")
     grace_notes = st.text_area("恩典與體會紀錄", placeholder="寫下神在這次服侍中給您的感動、恩典或學習...", height=150)
     submit_button = st.form_submit_button(label="儲存恩典紀錄")
@@ -70,7 +65,6 @@ if submit_button:
         try:
             supabase.table("service_records").insert(data).execute()
             st.sidebar.success("🎉 感謝主！恩典紀錄已成功同步至雲端資料庫。")
-            st.cache_data.clear() 
         except Exception as e:
             st.sidebar.error(f"❌ 儲存失敗，請檢查連線：{e}")
 
@@ -81,29 +75,28 @@ col1, col2 = st.columns(2)
 with col1:
     search_keyword = st.text_input("關鍵字搜尋（服侍內容或恩典感言）", placeholder="輸入想尋找的關鍵字...")
 with col2:
-    # 篩選選單也會同步更新
     search_role = st.selectbox("篩選事奉崗位", ["全部"] + roles_list)
 
-# 從 Supabase 撈取資料
-@st.cache_data(ttl=60)
-def fetch_data():
-    try:
-        response = supabase.table("service_records").select("*").order("service_date", descending=True).execute()
-        return pd.DataFrame(response.data)
-    except Exception:
-        return pd.DataFrame()
-
-df_raw = fetch_data()
+# 🛠️ 這裡已經移除了舊的快取，保證資料即時顯示
+try:
+    response = supabase.table("service_records").select("service_date, role, content, grace_notes").order("service_date", descending=True).execute()
+    df_raw = pd.DataFrame(response.data)
+except Exception as e:
+    st.error(f"讀取資料失敗：{e}")
+    df_raw = pd.DataFrame()
 
 if df_raw.empty:
     st.info("目前雲端尚無符合條件的恩典紀錄，快在左側寫下第一個恩典吧！")
 else:
     df = df_raw.copy()
+    
+    # 進行前端篩選
     if search_role != "全部":
         df = df[df["role"] == search_role]
     if search_keyword:
         df = df[df["content"].str.contains(search_keyword, na=False) | df["grace_notes"].str.contains(search_keyword, na=False)]
 
+    # 重新命名欄位
     df_display = df.rename(columns={
         "service_date": "事奉日期",
         "role": "事奉崗位",
@@ -111,6 +104,7 @@ else:
         "grace_notes": "恩典與體會"
     })
 
+    # 顯示統計數據
     st.subheader("📊 恩典統計")
     total_services = len(df_display)
     unique_roles = df_display["事奉崗位"].nunique() if total_services > 0 else 0
@@ -119,6 +113,7 @@ else:
     stat_col1.metric("總服侍次數", f"{total_services} 次")
     stat_col2.metric("投入崗位數", f"{unique_roles} 個")
 
+    # 顯示紀錄表格
     st.subheader("📜 歷史紀錄清單")
     if df_display.empty:
         st.warning("查無符合篩選條件的紀錄。")

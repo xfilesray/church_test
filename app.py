@@ -1,3 +1,20 @@
+已將頁面切換機制改為狀態控管（Session State Navigation），資料儲存成功後會自動識別紀錄類型，將畫面直接跳轉至右側對應的頁籤。
+
+### 核心修改說明
+
+* **動態頁籤連動**：將原生 `st.tabs` 改為具備狀態控管的水平單選頁籤，實現程式碼控制頁面切換。
+* **自動導向邏輯**：
+* 儲存 **排班資料** (`SCHEDULE`) $\rightarrow$ 自動跳轉至 `📅 未來事奉人手時間表`
+* 儲存 **借用資料** (`ROOMS`) $\rightarrow$ 自動跳轉至 `🏠 房間/場地借用狀態`
+* 儲存 **恩典日記** (`DIARY`) $\rightarrow$ 自動跳轉至 `📜 歷史恩典紀錄與數算`
+
+
+
+---
+
+📄 **修改後的完整檔二：app.py**
+
+```python
 import constants as c
 from datetime import datetime, time
 import pandas as pd
@@ -20,6 +37,10 @@ if "SUPABASE_URL" in st.secrets and "SUPABASE_KEY" in st.secrets:
 else:
     st.error("Missing Secrets keys.")
     st.stop()
+
+# Initialize Active Tab State
+if "active_tab" not in st.session_state:
+    st.session_state["active_tab"] = c.TABS[0]
 
 st.title(c.MAIN_TITLE)
 st.markdown("---")
@@ -132,10 +153,21 @@ def save_to_supabase(
     try:
         supabase.table("service_records").insert(insert_data).execute()
         st.success("🎉 Data successfully saved!")
-        st.session_state.clear()
+
+        # Dynamic Tab Switching based on saved type
+        if type_str == "SCHEDULE":
+            st.session_state["active_tab"] = c.TABS[0]
+        elif type_str == "ROOMS":
+            st.session_state["active_tab"] = c.TABS[1]
+        else:
+            st.session_state["active_tab"] = c.TABS[2]
+
+        st.session_state.pop("c_m", None)
+        st.session_state.pop("p_d", None)
+
         import time as t_mod
 
-        t_mod.sleep(1.0)
+        t_mod.sleep(0.8)
         st.rerun()
     except Exception as save_err:
         st.error(f"Save failed: {save_err}")
@@ -148,7 +180,7 @@ if submit_button:
     conflict_msg = []
 
     if not df_raw.empty:
-        # 1. Room Conflict Check (Date + Time + Room)
+        # 1. Room Conflict Check
         if final_room.strip():
             same_room_time = df_raw[
                 (df_raw["service_date"] == date_str)
@@ -161,7 +193,7 @@ if submit_button:
                     f"Conflict: Room [{final_room.strip()}] is already booked on {date_str} {time_str}"
                 )
 
-        # 2. Staff Conflict Check (Date + Time + People)
+        # 2. Staff Conflict Check
         if people.strip():
             input_names = [
                 n.strip()
@@ -185,7 +217,7 @@ if submit_button:
                             f"Conflict: Staff [{name}] is already assigned/booked on {date_str} {time_str}"
                         )
 
-        # 3. Role Conflict Check (Date + Time + Role in SCHEDULE)
+        # 3. Role Conflict Check
         if selected_type_key == "SCHEDULE" and role.strip():
             same_time_role = df_raw[
                 (df_raw["service_date"] == date_str)
@@ -237,15 +269,26 @@ if "c_m" in st.session_state:
             save_to_supabase(p1, p2, p3, p4, p5, p6, p7, p8, p9)
     with col_no:
         if st.button("Cancel"):
-            st.session_state.clear()
+            st.session_state.pop("c_m", None)
+            st.session_state.pop("p_d", None)
             st.rerun()
 
-# Main Display Tabs
-tab1, tab2, tab3 = st.tabs(c.TABS)
+# Main Display Controlled Tabs
+selected_tab = st.radio(
+    "",
+    options=c.TABS,
+    index=c.TABS.index(st.session_state.get("active_tab", c.TABS[0])),
+    key="tab_selector",
+    horizontal=True,
+    label_visibility="collapsed",
+)
+st.session_state["active_tab"] = selected_tab
+st.markdown("---")
+
 today_str = datetime.now().strftime("%Y-%m-%d")
 
 # TAB 1: SCHEDULE
-with tab1:
+if selected_tab == c.TABS[0]:
     st.subheader(c.TABS[0])
     if df_raw.empty:
         st.info("No data available.")
@@ -273,7 +316,7 @@ with tab1:
         )
 
 # TAB 2: ROOMS
-with tab2:
+elif selected_tab == c.TABS[1]:
     st.subheader(c.TABS[1])
     if df_raw.empty:
         st.info("No data available.")
@@ -301,7 +344,7 @@ with tab2:
         )
 
 # TAB 3: DIARY
-with tab3:
+elif selected_tab == c.TABS[2]:
     st.subheader(c.TABS[2])
     if df_raw.empty:
         st.info("No data available.")
@@ -342,3 +385,5 @@ with tab3:
                 st.write(f"Companions: {f_row['同行同工']}")
                 st.write(f"Summary: {f_row['摘要']}")
                 st.success(str(f_row["恩典體會"]))
+
+```

@@ -28,6 +28,73 @@ if "active_tab" not in st.session_state:
 st.title(c.MAIN_TITLE)
 st.markdown("---")
 
+# ----------------------------------------------------
+# 🌐 英中同義詞字典（可自由新增關鍵字對照）
+# ----------------------------------------------------
+ENG_TO_CHI_MAP = {
+    # 事奉崗位 (Roles)
+    "worship": ["敬拜", "主領", "領唱"],
+    "sing": ["領唱", "主領"],
+    "singer": ["領唱", "主領"],
+    "piano": ["司琴", "伴奏"],
+    "pianist": ["司琴", "伴奏"],
+    "music": ["司琴", "伴奏", "敬拜"],
+    "sound": ["音控", "直播"],
+    "audio": ["音控", "直播"],
+    "media": ["音控", "直播"],
+    "host": ["司會", "主持"],
+    "mc": ["司會"],
+    "welcome": ["接待", "招聚"],
+    "usher": ["接待"],
+    # 場地房間 (Rooms)
+    "main": ["大堂"],
+    "hall": ["大堂", "副堂"],
+    "main hall": ["大堂"],
+    "sub hall": ["副堂"],
+    "side hall": ["副堂"],
+    "room": ["教室", "會客室", "房間"],
+    "classroom": ["教室"],
+    "meeting room": ["會客室"],
+    # 小組單位 (Groups)
+    "sunday school": ["主日學"],
+    "youth": ["青年", "社青"],
+    "young adult": ["社青"],
+    "women": ["婦女", "婦女會"],
+    "men": ["弟兄", "弟兄會"],
+    "choir": ["詩班", "敬拜"],
+    # 日期與時間 (Dates / Time)
+    "sunday": ["主日"],
+    "sun": ["主日"],
+    "morning": ["早", "上午"],
+    "evening": ["晚", "下午"],
+}
+
+# 全欄位 + 英中同義詞智慧搜尋函式
+def filter_all_columns_smart(df, query):
+    if not query or not query.strip():
+        return df
+
+    q_clean = query.strip().lower()
+
+    # 1. 蒐集搜尋關鍵字（包含原始輸入文字）
+    search_terms = [q_clean]
+
+    # 2. 檢查英文同義詞映射字典
+    for eng_key, chi_terms in ENG_TO_CHI_MAP.items():
+        if eng_key in q_clean:
+            search_terms.extend(chi_terms)
+
+    # 3. 建立多關鍵字 OR 搜尋邏輯
+    pattern = "|".join(search_terms)
+
+    # 4. 掃描 DataFrame 所有欄位
+    mask = df.astype(str).apply(
+        lambda row: row.str.contains(pattern, case=False, na=False).any(),
+        axis=1,
+    )
+    return df[mask]
+
+
 # 側邊欄 - 資料輸入表單
 st.sidebar.header("📋 資料輸入表單")
 
@@ -270,17 +337,6 @@ st.markdown("---")
 
 today_str = datetime.now().strftime("%Y-%m-%d")
 
-# 全欄位搜尋函式
-def filter_all_columns(df, query):
-    if not query:
-        return df
-    # 檢查每一行的所有欄位，只要有任何一個欄位包含搜尋關鍵字即保留
-    mask = df.astype(str).apply(
-        lambda row: row.str.contains(query, case=False, na=False).any(), axis=1
-    )
-    return df[mask]
-
-
 # 分頁 1: 未來事奉排班
 if selected_tab == c.TABS[0]:
     st.subheader(c.TABS[0])
@@ -295,15 +351,17 @@ if selected_tab == c.TABS[0]:
             .copy()
             .sort_values(by=["service_date", "service_time"])
         )
-        
-        # 重新命名欄位以便呈現與搜尋
+
         df_s_disp = df_s.rename(columns=c.DF_COL_MAP_SCHEDULE)[
             list(c.DF_COL_MAP_SCHEDULE.values())
         ]
-        
-        q_s = st.text_input("🔍 搜尋事奉排班（可搜尋所有欄位）：", placeholder="輸入任意關鍵字（日期、崗位、姓名、備註...）")
+
+        q_s = st.text_input(
+            "🔍 搜尋事奉排班（支援中英文對照搜尋）：",
+            placeholder="輸入中英文關鍵字（如：Piano 搜尋司琴 / Youth 搜尋青年）",
+        )
         if q_s:
-            df_s_disp = filter_all_columns(df_s_disp, q_s)
+            df_s_disp = filter_all_columns_smart(df_s_disp, q_s)
 
         st.dataframe(df_s_disp, use_container_width=True)
 
@@ -321,14 +379,17 @@ elif selected_tab == c.TABS[1]:
             .copy()
             .sort_values(by=["service_date", "service_time"])
         )
-        
+
         df_r_disp = df_r.rename(columns=c.DF_COL_MAP_ROOMS)[
             list(c.DF_COL_MAP_ROOMS.values())
         ]
-        
-        q_r = st.text_input("🔍 搜尋場地預約（可搜尋所有欄位）：", placeholder="輸入任意關鍵字（日期、場地、小組、負責人...）")
+
+        q_r = st.text_input(
+            "🔍 搜尋場地預約（支援中英文對照搜尋）：",
+            placeholder="輸入中英文關鍵字（如：Main Hall 搜尋大堂）",
+        )
         if q_r:
-            df_r_disp = filter_all_columns(df_r_disp, q_r)
+            df_r_disp = filter_all_columns_smart(df_r_disp, q_r)
 
         st.dataframe(df_r_disp, use_container_width=True)
 
@@ -343,14 +404,17 @@ elif selected_tab == c.TABS[2]:
             .copy()
             .sort_values(by="service_date", ascending=False)
         )
-        
+
         df_g_disp = df_g.rename(columns=c.DF_COL_MAP_DIARY)[
             list(c.DF_COL_MAP_DIARY.values())
         ]
-        
-        q_g = st.text_input("🔍 搜尋恩典日記（可搜尋所有欄位）：", placeholder="輸入任意關鍵字（日期、同工、心得、摘要...）")
+
+        q_g = st.text_input(
+            "🔍 搜尋恩典日記（支援中英文對照搜尋）：",
+            placeholder="輸入任意關鍵字（如：Worship 搜尋敬拜）",
+        )
         if q_g:
-            df_g_disp = filter_all_columns(df_g_disp, q_g)
+            df_g_disp = filter_all_columns_smart(df_g_disp, q_g)
 
         st.dataframe(df_g_disp, use_container_width=True)
         st.markdown("---")

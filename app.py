@@ -42,7 +42,7 @@ roles_list = [
     "其他"
 ]
 
-# 💡 在這裡自訂您教會的常用小組/團契名稱（選單會自動讀取）
+# 自訂您教會的常用小組/團契名稱
 groups_list = [
     "大衛小組",
     "約書亞青年團契",
@@ -57,16 +57,14 @@ st.sidebar.header("🌟 記錄新恩典")
 with st.sidebar.form(key="grace_form", clear_on_submit=True):
     service_date = st.date_input("事奉日期", datetime.now())
     role = st.selectbox("事奉崗位", roles_list)
-    content = st.text_input("服侍內容摘要", placeholder="例如：主日崇拜司琴、帶領小組查經...")
+    content = st.text_input("服侍內容摘要", placeholder="例如：主日崇拜司琴...")
     
-    # 🌟 新增：小組名稱智慧選擇與輸入
     selected_group = st.selectbox("選擇小組/團契名稱", groups_list)
     custom_group = st.text_input("✍️ 若選擇『其他』，請在此輸入新小組名稱：", placeholder="例如：提摩太小組")
     
-    # 決定最終寫入的小組名稱
     final_group = custom_group.strip() if (selected_group == "其他 / 請自行於下方輸入" and custom_group.strip()) else selected_group
     
-    people = st.text_input("同行同工 / 相關人名", placeholder="例如：陳牧師、張弟兄（多名可用逗號隔開）")
+    people = st.text_input("同行同工 / 相關人名", placeholder="例如：陳牧師、張弟兄")
     grace_notes = st.text_area("恩典與體會紀錄", placeholder="寫下神在這次服侍中給您的感動、恩典或學習...", height=150)
     submit_button = st.form_submit_button(label="儲存恩典紀錄")
 
@@ -79,7 +77,7 @@ if submit_button:
             "service_date": date_str,
             "role": role,
             "content": content,
-            "group_name": final_group, # 🌟 寫入小組資料
+            "group_name": final_group,
             "people": people,
             "grace_notes": grace_notes
         }
@@ -92,16 +90,12 @@ if submit_button:
 # 主頁面：查詢與數算恩典
 st.header("🔍 數算與查詢恩典")
 
-# 🔍 搜尋與篩選控制區（擴充為四欄篩選）
-col1, col2, col3, col4 = st.columns(4)
+# 🔍 簡化後的搜尋與篩選控制區（只保留一個關鍵字輸入框與一個崗位選單）
+col1, col2 = st.columns([3, 1]) # 設定比例讓搜尋框更寬
 with col1:
-    search_keyword = st.text_input("📝 關鍵字搜尋（內容/感言）", placeholder="輸入想尋找的關鍵字...")
+    # 🌟 核心修改：單一萬用關鍵字搜尋框
+    search_universal = st.text_input("🔍 全方位萬用搜尋", placeholder="可以輸入任何人名、小組名稱、服侍摘要或感動文字...")
 with col2:
-    search_people = st.text_input("👤 搜尋特定人名 / 同工", placeholder="輸入同工或人名...")
-with col3:
-    # 🌟 新增：小組名稱搜尋框
-    search_group = st.text_input("🏘️ 搜尋特定小組 / 團契", placeholder="輸入小組或團契名稱...")
-with col4:
     search_role = st.selectbox("🏷️ 篩選事奉崗位", ["全部"] + roles_list)
 
 # 從 Supabase 撈取資料
@@ -126,13 +120,16 @@ else:
     # 進行前端多條件篩選
     if search_role != "全部":
         df = df[df["role"] == search_role]
-    if search_keyword:
-        df = df[df["content"].str.contains(search_keyword, na=False) | df["grace_notes"].str.contains(search_keyword, na=False)]
-    if search_people:
-        df = df[df["people"].str.contains(search_people, na=False)]
-    if search_group:
-        # 🌟 篩選小組欄位
-        df = df[df["group_name"].str.contains(search_group, na=False)]
+        
+    if search_universal:
+        # 🌟 核心修改：一個關鍵字同時對比四個欄位 (OR 邏輯)
+        keyword = search_universal.strip()
+        df = df[
+            df["content"].str.contains(keyword, na=False) | 
+            df["grace_notes"].str.contains(keyword, na=False) | 
+            df["people"].str.contains(keyword, na=False) | 
+            df["group_name"].str.contains(keyword, na=False)
+        ]
 
     # 重新命名欄位供前端顯示
     df_display = df.rename(columns={

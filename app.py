@@ -42,12 +42,31 @@ roles_list = [
     "其他"
 ]
 
+# 💡 在這裡自訂您教會的常用小組/團契名稱（選單會自動讀取）
+groups_list = [
+    "大衛小組",
+    "約書亞青年團契",
+    "迦勒長青團契",
+    "喜樂家庭小組",
+    "安得烈小組",
+    "其他 / 請自行於下方輸入"
+]
+
 # 側邊欄：新增恩典紀錄
 st.sidebar.header("🌟 記錄新恩典")
 with st.sidebar.form(key="grace_form", clear_on_submit=True):
     service_date = st.date_input("事奉日期", datetime.now())
     role = st.selectbox("事奉崗位", roles_list)
     content = st.text_input("服侍內容摘要", placeholder="例如：主日崇拜司琴、帶領小組查經...")
+    
+    # 🌟 新增：小組名稱智慧選擇與輸入
+    selected_group = st.selectbox("選擇小組/團契名稱", groups_list)
+    custom_group = st.text_input("✍️ 若選擇『其他』，請在此輸入新小組名稱：", placeholder="例如：提摩太小組")
+    
+    # 決定最終寫入的小組名稱
+    final_group = custom_group.strip() if (selected_group == "其他 / 請自行於下方輸入" and custom_group.strip()) else selected_group
+    
+    people = st.text_input("同行同工 / 相關人名", placeholder="例如：陳牧師、張弟兄（多名可用逗號隔開）")
     grace_notes = st.text_area("恩典與體會紀錄", placeholder="寫下神在這次服侍中給您的感動、恩典或學習...", height=150)
     submit_button = st.form_submit_button(label="儲存恩典紀錄")
 
@@ -60,6 +79,8 @@ if submit_button:
             "service_date": date_str,
             "role": role,
             "content": content,
+            "group_name": final_group, # 🌟 寫入小組資料
+            "people": people,
             "grace_notes": grace_notes
         }
         try:
@@ -71,16 +92,21 @@ if submit_button:
 # 主頁面：查詢與數算恩典
 st.header("🔍 數算與查詢恩典")
 
-col1, col2 = st.columns(2)
+# 🔍 搜尋與篩選控制區（擴充為四欄篩選）
+col1, col2, col3, col4 = st.columns(4)
 with col1:
-    search_keyword = st.text_input("關鍵字搜尋（服侍內容或恩典感言）", placeholder="輸入想尋找的關鍵字...")
+    search_keyword = st.text_input("📝 關鍵字搜尋（內容/感言）", placeholder="輸入想尋找的關鍵字...")
 with col2:
-    search_role = st.selectbox("篩選事奉崗位", ["全部"] + roles_list)
+    search_people = st.text_input("👤 搜尋特定人名 / 同工", placeholder="輸入同工或人名...")
+with col3:
+    # 🌟 新增：小組名稱搜尋框
+    search_group = st.text_input("🏘️ 搜尋特定小組 / 團契", placeholder="輸入小組或團契名稱...")
+with col4:
+    search_role = st.selectbox("🏷️ 篩選事奉崗位", ["全部"] + roles_list)
 
-# 🛠️ 這裡已經移除了舊的快取，保證資料即時顯示
+# 從 Supabase 撈取資料
 try:
-    #  新版正確寫法
-    response = supabase.table("service_records").select("service_date, role, content, grace_notes").order("service_date", desc=True).execute()
+    response = supabase.table("service_records").select("service_date, role, content, group_name, people, grace_notes").order("service_date", desc=True).execute()
     df_raw = pd.DataFrame(response.data)
 except Exception as e:
     st.error(f"讀取資料失敗：{e}")
@@ -91,17 +117,30 @@ if df_raw.empty:
 else:
     df = df_raw.copy()
     
-    # 進行前端篩選
+    # 填補空值避免篩選時報錯
+    df["group_name"] = df["group_name"].fillna("")
+    df["people"] = df["people"].fillna("")
+    df["content"] = df["content"].fillna("")
+    df["grace_notes"] = df["grace_notes"].fillna("")
+    
+    # 進行前端多條件篩選
     if search_role != "全部":
         df = df[df["role"] == search_role]
     if search_keyword:
         df = df[df["content"].str.contains(search_keyword, na=False) | df["grace_notes"].str.contains(search_keyword, na=False)]
+    if search_people:
+        df = df[df["people"].str.contains(search_people, na=False)]
+    if search_group:
+        # 🌟 篩選小組欄位
+        df = df[df["group_name"].str.contains(search_group, na=False)]
 
-    # 重新命名欄位
+    # 重新命名欄位供前端顯示
     df_display = df.rename(columns={
         "service_date": "事奉日期",
         "role": "事奉崗位",
         "content": "服侍內容",
+        "group_name": "所屬小組/團契",
+        "people": "同行同工/人名",
         "grace_notes": "恩典與體會"
     })
 
@@ -120,7 +159,7 @@ else:
         st.warning("查無符合篩選條件的紀錄。")
     else:
         st.dataframe(
-            df_display[["事奉日期", "事奉崗位", "服侍內容", "恩典與體會"]],
+            df_display[["事奉日期", "事奉崗位", "所屬小組/團契", "服侍內容", "同行同工/人名", "恩典與體會"]],
             use_container_width=True,
             column_config={"恩典與體會": st.column_config.TextColumn("恩典與體會", width="large")}
         )
@@ -135,7 +174,8 @@ else:
         
         if selected_index is not None:
             row = df_display.loc[selected_index]
-            st.info(f"**📅 日期：** {row['事奉日期']}  |  **🏷️ 崗位：** {row['事奉崗位']}")
+            st.info(f"**📅 日期：** {row['事奉日期']}  |  **🏷️ 崗位：** {row['事奉崗位']}  |  **🏘️ 小組：** {row['所屬小組/團契'] if row['所屬小組/團契'] else '無紀錄'}")
+            st.write(f"**👤 同行同工：** {row['同行同工/人名'] if row['同行同工/人名'] else '無紀錄'}")
             if row['服侍內容']:
                 st.write(f"**📋 服侍摘要：** {row['服侍內容']}")
             st.write("**🕊️ 恩典與體會日記：**")

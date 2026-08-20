@@ -1,7 +1,7 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 from datetime import datetime
+from supabase import create_client, Client
 
 # 設置網頁標題與圖標
 st.set_page_config(
@@ -10,45 +10,34 @@ st.set_page_config(
     layout="wide"
 )
 
-# 初始化本地 SQLite 資料庫
-def init_db():
-    conn = sqlite3.connect("church_grace_web.db", check_same_thread=False)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS service_records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            service_date TEXT NOT NULL,
-            role TEXT NOT NULL,
-            content TEXT,
-            grace_notes TEXT,
-            created_at TEXT
-        )
-    """)
-    conn.commit()
-    return conn
+# 從 Streamlit Secrets 或本地環境安全讀取雲端連線資訊
+try:
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+except Exception:
+    # 本地測試時若未設定 Secrets 的備用提示
+    SUPABASE_URL = "請在此處貼上您的_SUPABASE_URL"
+    SUPABASE_KEY = "請在此處貼上您的_SUPABASE_KEY"
 
-conn = init_db()
-cursor = conn.cursor()
+# 初始化 Supabase 雲端客戶端
+@st.cache_resource
+def get_supabase_client() -> Client:
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+supabase = get_supabase_client()
 
 # 應用程式標題
-st.title("⛪ 個人教會事奉恩典紀錄及查詢系統")
+st.title("⛪ 個人教會事奉恩典紀錄及查詢系統 (雲端永久版)")
 st.markdown("---")
 
 # 側邊欄：新增恩典紀錄
 st.sidebar.header("🌟 記錄新恩典")
 with st.sidebar.form(key="grace_form", clear_on_submit=True):
-    # 日期選擇器
     service_date = st.date_input("事奉日期", datetime.now())
-    
-    # 崗位選擇
     roles_list = ["敬拜隊/司琴", "主日學/助教", "音控/直播", "接待/司事", "小組長/牧養", "關懷/探訪", "其他"]
     role = st.selectbox("事奉崗位", roles_list)
-    
-    # 文字輸入
     content = st.text_input("服侍內容摘要", placeholder="例如：主日崇拜司琴、帶領小組查經...")
     grace_notes = st.text_area("恩典與體會紀錄", placeholder="寫下神在這次服侍中給您的感動、恩典或學習...", height=150)
-    
-    # 提交按鈕
     submit_button = st.form_submit_button(label="儲存恩典紀錄")
 
 if submit_button:
@@ -56,78 +45,92 @@ if submit_button:
         st.sidebar.error("❌ 請填寫『恩典與體會紀錄』！")
     else:
         date_str = service_date.strftime("%Y-%m-%d")
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        cursor.execute("""
-            INSERT INTO service_records (service_date, role, content, grace_notes, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        """, (date_str, role, content, grace_notes, now_str))
-        conn.commit()
-        st.sidebar.success("🎉 感謝主！恩典紀錄已成功儲存。")
+        # 寫入 Supabase 雲端資料庫
+        data = {
+            "service_date": date_str,
+            "role": role,
+            "content": content,
+            "grace_notes": grace_notes
+        }
+        try:
+            supabase.table("service_records").insert(data).execute()
+            st.sidebar.success("🎉 感謝主！恩典紀錄已成功同步至雲端資料庫。")
+            st.cache_data.clear() # 清除快取以刷新數據
+        except Exception as e:
+            st.sidebar.error(f"❌ 儲存失敗，請檢查連線：{e}")
 
 # 主頁面：查詢與數算恩典
 st.header("🔍 數算與查詢恩典")
 
-# 篩選控制項
 col1, col2 = st.columns(2)
 with col1:
     search_keyword = st.text_input("關鍵字搜尋（服侍內容或恩典感言）", placeholder="輸入想尋找的關鍵字...")
 with col2:
     search_role = st.selectbox("篩選事奉崗位", ["全部"] + roles_list)
 
-# 從資料庫撈取資料
-query = "SELECT id, service_date AS 事奉日期, role AS 事奉崗位, content AS 服侍內容, grace_notes AS 恩典與體會 FROM service_records WHERE 1=1"
-params = []
+# 從 Supabase 撈取資料
+@st.cache_data(ttl=60) # 緩存數據 60 秒，避免頻繁讀取雲端
+def fetch_data():
+    try:
+        response = supabase.table("service_records").select("*").order("service_date", descending=True).execute()
+        return pd.DataFrame(response.data)
+    except Exception:
+        return pd.DataFrame()
 
-if search_role != "全部":
-    query += " AND role = ?"
-    params.append(search_role)
+df_raw = fetch_data()
 
-if search_keyword:
-    query += " AND (content LIKE ? OR grace_notes LIKE ?)"
-    params.append(f"%{search_keyword}%")
-    params.append(f"%{search_keyword}%")
+if df_raw.empty:
+    st.info("目前雲端尚無符合條件的恩典紀錄，快在左側寫下第一個恩典吧！")
+else:
+    # 前端篩選資料
+    df = df_raw.copy()
+    if search_role != "全部":
+        df = df[df["role"] == search_role]
+    if search_keyword:
+        df = df[df["content"].str.contains(search_keyword, na=False) | df["grace_notes"].str.contains(search_keyword, na=False)]
 
-query += " ORDER BY service_date DESC"
+    # 重新命名欄位供表格顯示
+    df_display = df.rename(columns={
+        "service_date": "事奉日期",
+        "role": "事奉崗位",
+        "content": "服侍內容",
+        "grace_notes": "恩典與體會"
+    })
 
-df = pd.read_sql_query(query, conn, params=params)
-
-# 顯示統計數據
-if not df.empty:
+    # 顯示統計數據
     st.subheader("📊 恩典統計")
-    total_services = len(df)
-    unique_roles = df["事奉崗位"].nunique()
+    total_services = len(df_display)
+    unique_roles = df_display["事奉崗位"].nunique() if total_services > 0 else 0
     
     stat_col1, stat_col2 = st.columns(2)
     stat_col1.metric("總服侍次數", f"{total_services} 次")
     stat_col2.metric("投入崗位數", f"{unique_roles} 個")
 
-# 顯示紀錄表格
-st.subheader("📜 歷史紀錄清單")
-if df.empty:
-    st.info("目前尚無符合條件的恩典紀錄，快在左側寫下第一個恩典吧！")
-else:
-    # 隱藏資料庫內部的 ID 欄位，讓畫面更乾淨
-    display_df = df.drop(columns=["id"])
-    
-    # 使用 Streamlit 的高互動性表格
-    st.dataframe(
-        display_df,
-        use_container_width=True,
-        column_config={
-            "恩典與體會": st.column_config.TextColumn("恩典與體會", width="large")
-        }
-    )
-    
-    # 詳細閱讀模式
-    st.markdown("---")
-    st.subheader("📖 恩典詳細閱讀器")
-    selected_index = st.selectbox("選擇要細細品味的紀錄日期與崗位：", df.index, format_func=lambda x: f"{df.loc[x, '事奉日期']} - 【{df.loc[x, '事奉崗位']}】 {df.loc[x, '服侍內容'][:15]}...")
-    
-    if selected_index is not None:
-        row = df.loc[selected_index]
-        st.info(f"**📅 日期：** {row['事奉日期']}  |  **🏷️ 崗位：** {row['事奉崗位']}")
-        if row['服侍內容']:
-            st.write(f"**📋 服侍摘要：** {row['服侍內容']}")
-        st.write("**🕊️ 恩典與體會日記：**")
-        st.success(row['恩典與體會'])
+    # 顯示紀錄表格
+    st.subheader("📜 歷史紀錄清單")
+    if df_display.empty:
+        st.warning("查無符合篩選條件的紀錄。")
+    else:
+        st.dataframe(
+            df_display[["事奉日期", "事奉崗位", "服侍內容", "恩典與體會"]],
+            use_container_width=True,
+            column_config={"恩典與體會": st.column_config.TextColumn("恩典與體會", width="large")}
+        )
+        
+        # 詳細閱讀模式
+        st.markdown("---")
+        st.subheader("📖 恩典詳細閱讀器")
+        selected_index = st.selectbox(
+            "選擇要細細品味的紀錄：", 
+            df_display.index, 
+            format_func=lambda x: f"{df_display.loc[x, '事奉日期']} - 【{df_display.loc[x, '事奉崗位']}】 {str(df_display.loc[x, '服侍內容'])[:15]}..."
+        )
+        
+        if selected_index is not None:
+            row = df_display.loc[selected_index]
+            st.info(f"**📅 日期：** {row['事奉日期']}  |  **🏷️ 崗位：** {row['事奉崗位']}")
+            if row['服侍內容']:
+                st.write(f"**📋 服侍摘要：** {row['服侍內容']}")
+            st.write("**🕊️ 恩典與體會日記：**")
+            st.success(row['恩典與體會'])

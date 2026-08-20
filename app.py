@@ -52,7 +52,7 @@ groups_list = [
     "其他 / 請自行於下方輸入"
 ]
 
-# 從 Supabase 撈取所有原始資料
+# 從 Supabase 撈取所有原始資料供全域與防重覆檢查使用
 try:
     response = supabase.table("service_records").select("service_date, role, content, group_name, people, grace_notes, record_type").order("service_date", desc=False).execute()
     df_raw = pd.DataFrame(response.data)
@@ -96,7 +96,7 @@ with st.sidebar.form(key="grace_form", clear_on_submit=True):
         
     submit_button = st.form_submit_button(label="儲存至雲端")
 
-# 智慧防重覆檢查邏輯
+# 🌟 智慧防重覆檢查邏輯
 if submit_button:
     if record_type == "🌟 恩典與體會日記" and not grace_notes:
         st.sidebar.error("❌ 記錄日記請務必填寫『恩典與體會紀錄』！")
@@ -105,29 +105,33 @@ if submit_button:
         type_db = "恩典日記" if record_type == "🌟 恩典與體會日記" else "事奉排班"
         
         conflict_detected = False
-        conflict_msg = []
+        conflict_messages = []
         
+        # 只有在「事奉排班」時才啟動時間與人手的嚴格重覆檢查
         if not df_raw.empty and type_db == "事奉排班":
-            same_role = df_raw[(df_raw["service_date"] == date_str) & (df_raw["role"] == role) & (df_raw["record_type"] == "事奉排班")]
-            if not same_role.empty:
+            # 1. 檢查【時間 + 崗位】是否重覆：同一天同一個崗位是否已經被排班了
+            check_role = df_raw[(df_raw["service_date"] == date_str) & (df_raw["role"] == role) & (df_raw["record_type"] == "事奉排班")]
+            if not check_role.empty:
                 conflict_detected = True
-                conflict_msg.append(f"⚠️ 警告：【{date_str}】的【{role}】崗位已被排班給：{same_role['people'].values}")
+                conflict_messages.append(f"🚨【時間衝突】{date_str} 的「{role}」崗位已被預定！目前排班同工為：{check_role['people'].values[0]}")
             
+            # 2. 檢查【時間 + 人手】是否重覆：輸入的同工在同一天是否已經有別的事奉
             if people.strip():
-                input_names = [n.strip() for n in people.replace("，", ",").split(",") if n.strip()]
-                day_records = df_raw[(df_raw["service_date"] == date_str) & (df_raw["record_type"] == "事奉排班")]
+                # 兼容全形和半形逗號，將輸入的名字切開
+                clean_people_input = people.replace("，", ",")
+                input_names = [name.strip() for name in clean_people_input.split(",") if name.strip()]
                 
-                for name in input_names:
-                    for idx, row in day_records.iterrows():
-                        if name in row["people"]:
+                # 找出當天所有已存在的事奉排班
+                current_day_schedules = df_raw[(df_raw["service_date"] == date_str) & (df_raw["record_type"] == "事奉排班")]
+                
+                for single_name in input_names:
+                    for index, each_schedule in current_day_schedules.iterrows():
+                        if single_name in each_schedule["people"]:
                             conflict_detected = True
-                            conflict_msg.append(f"⚠️ 警告：同工【{name}】在【{date_str}】已有服侍：【{row['role']}】({row['content']})")
+                            conflict_messages.append(f"⚠️【人手重覆】同工「{single_name}」在 {date_str} 已經有「{each_schedule['role']}」的事奉紀錄！")
 
-        if conflict_detected:
-            for msg in conflict_msg:
-                st.warning(msg)
-                
-        data = {
+        # 寫入雲端資料庫
+        data_to_save = {
             "service_date": date_str,
             "role": role,
             "content": content,
@@ -136,10 +140,19 @@ if submit_button:
             "grace_notes": grace_notes,
             "record_type": type_db
         }
+        
         try:
-            supabase.table("service_records").insert(data).execute()
-            st.sidebar.success(f"🎉 成功同步一筆【{type_db}】至雲端！")
-            st.rerun()
+            supabase.table("service_records").insert(data_to_save).execute()
+            
+            # 儲存成功後，如果有衝突，就以強烈警告形式顯示在主畫面上
+            if conflict_detected:
+                st.sidebar.success(f"🎉 儲存成功，但系統偵測到以下排班重覆：")
+                for single_msg in conflict_messages:
+                    st.warning(single_msg)
+            else:
+                st.sidebar.success(f"🎉 成功同步一筆【{type_db}】至雲端！")
+                
+            st.rerun() # 刷新畫面
         except Exception as e:
             st.sidebar.error(f"❌ 儲存失敗：{e}")
 
@@ -154,7 +167,7 @@ tab1, tab2 = st.tabs(["📅 未來事奉人手時間表", "📜 歷史恩典紀�
 # --------------------------------------------------------
 with tab1:
     st.subheader("🗓️ 近期及未來事奉排班預告")
-    st.caption("系統會自動篩選出今日（含）以後的事奉行程，方便同工對表。")
+    st.caption("系統會自動篩選出今日（含）以後的事奉排班，方便同工對表。")
     
     if df_raw.empty:
         st.info("目前雲端尚無任何事奉排班資料。")
@@ -239,7 +252,6 @@ with tab2:
             
             st.markdown("---")
             
-            # 使用大寬度顯示歷史清單
             st.dataframe(
                 df_grace_disp[["事奉日期", "事奉崗位", "所屬小組/團契", "服侍內容", "同行同工/人名", "恩典與體會"]],
                 use_container_width=True
@@ -247,19 +259,9 @@ with tab2:
             
             st.markdown("---")
             st.subheader("📖 恩典詳細閱讀器")
-            
-            selected_index = st.selectbox(
+            selected_key = st.selectbox(
                 "選擇要細細品味的紀錄：", 
                 df_grace_disp.index, 
                 format_func=lambda x: f"{df_grace_disp.loc[x, '事奉日期']} - 【{df_grace_disp.loc[x, '事奉崗位']}】 {str(df_grace_disp.loc[x, '服侍內容'])[:15]}..."
             )
-            
-            if selected_index is not None:
-                # 🌟 核心修正：使用位置索引（iloc）精準抓取表格中的特定位置，程式碼內完全抹除容易出錯的字串
-                target_row = df_grace_disp.loc[selected_index]
-                st.info(f"**📅 日期：** {target_row.iloc[0]}  |  **🏷️ 崗位：** {target_row.iloc[1]}  |  **🏘️ 小組：** {target_row.iloc[2]}")
-                st.write(f"**👤 同行同工：** {target_row.iloc[4]}")
-                st.write(f"**📋 服侍摘要：** {target_row.iloc[3]}")
-                st.write("**🕊️ 恩典日記內文：**")
-                st.success(target_row.iloc[5])
-                # 這裡使用第 5 欄（恩典日記內文）進行顯示
+if selected_key is not None:final_row = df_grace_disp.loc[selected_key]st.info(f"📅 日期： {final_row['事奉日期']}  |  🏷️ 崗位： {final_row['事奉崗位']}  |  🏘️ 小組： {final_row['所屬小組/團契']}")st.write(f"👤 同行同工： {final_row['同行同工/人名']}")st.write(f"📋 服侍摘要： {final_row['服侍內容']}")st.write("🕊️ 恩典與體會日記：")# 🌟 使用最安全的純字串讀取，完美解決網頁端的翻譯與錯字 Bugst.success(str(final_row['恩典與體會']))

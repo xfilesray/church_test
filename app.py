@@ -1,5 +1,5 @@
-import constants as c
 from datetime import datetime, time
+import constants as c
 import pandas as pd
 import streamlit as st
 from supabase import Client, create_client
@@ -28,7 +28,7 @@ if "active_tab" not in st.session_state:
 st.title(c.MAIN_TITLE)
 st.markdown("---")
 
-# 4. 先讀取雲端資料 (確保 df_raw 在渲染表單與選單前已載入完成)
+# 4. 讀取雲端資料 (確保在渲染表單與選單前已載入完成)
 try:
     response = (
         supabase.table("service_records")
@@ -55,6 +55,7 @@ if not df_raw.empty:
     df_raw["grace_notes"] = df_raw["grace_notes"].fillna("").astype(str)
     df_raw["room_name"] = df_raw["room_name"].fillna("").astype(str)
 
+
 # 6. 動態選單處理函式（合併基礎選項與 Supabase 資料庫中的歷史自訂輸入）
 def get_dynamic_options(base_options, raw_df, column_name):
     clean_base = [x for x in base_options if x != c.OTHER_CUSTOM_TRIGGER]
@@ -71,12 +72,13 @@ def get_dynamic_options(base_options, raw_df, column_name):
     all_options.append(c.OTHER_CUSTOM_TRIGGER)
     return all_options
 
+
 # 動態生成最新的選單清單（包含歷史自訂新增項）
 dynamic_groups = get_dynamic_options(c.GROUPS, df_raw, "group_name")
 dynamic_roles = get_dynamic_options(c.ROLES, df_raw, "role")
 dynamic_rooms = get_dynamic_options(c.ROOMS, df_raw, "room_name")
 
-# 7. 英中同義詞智慧全欄位搜尋
+# 7. 英中同義詞智慧全欄位搜尋字典
 ENG_TO_CHI_MAP = {
     "worship": ["敬拜", "主領", "領唱"],
     "sing": ["領唱", "主領"],
@@ -111,6 +113,7 @@ ENG_TO_CHI_MAP = {
     "evening": ["晚", "下午"],
 }
 
+
 def filter_all_columns_smart(df, query):
     if not query or not query.strip():
         return df
@@ -125,6 +128,7 @@ def filter_all_columns_smart(df, query):
         axis=1,
     )
     return df[mask]
+
 
 # 8. 寫入 Supabase 函式
 def save_to_supabase(
@@ -156,10 +160,12 @@ def save_to_supabase(
         st.session_state.pop("p_d", None)
 
         import time as t_mod
+
         t_mod.sleep(0.8)
         st.rerun()
     except Exception as save_err:
         st.error(f"儲存失敗：{save_err}")
+
 
 # 9. 側邊欄 - 資料輸入表單
 st.sidebar.header("📋 資料輸入表單")
@@ -175,18 +181,22 @@ with st.sidebar.form(key="f_main", clear_on_submit=False):
     t_in = st.time_input("時間", time(9, 30))
     time_str = t_in.strftime("%H:%M")
 
-    # 動態選單：選擇小組/單位（包含自訂選項）
-   # 下拉選單：請選擇小組
-sel_group = st.selectbox("請選擇小組", dynamic_groups)
+    # ----------------------------------------------------
+    # 【小組輸入區域】
+    # ----------------------------------------------------
+    sel_group = st.selectbox("請選擇小組", dynamic_groups)
+    if sel_group == c.OTHER_CUSTOM_TRIGGER:
+        final_group = st.text_input(
+            "自訂小組名稱", placeholder="請輸入新小組名稱..."
+        )
+    else:
+        final_group = sel_group
 
-# 判斷：只有當選擇「其他 / 請自行於下方輸入」時，才會展開輸入框
-if sel_group == c.OTHER_CUSTOM_TRIGGER:
-    final_group = st.text_input("自訂小組名稱", placeholder="請輸入新小組名稱...")
-else:
-    final_group = sel_group
-
+    # ----------------------------------------------------
+    # 【表單分流：場地借用 vs. 事奉排班/恩典日記】
+    # ----------------------------------------------------
     if selected_type_key == "ROOMS":
-        # 動態選單：選擇場地/房間（包含自訂選項）
+        # 【場地選擇】
         sel_room = st.selectbox("請選擇場地/房間", dynamic_rooms)
         if sel_room == c.OTHER_CUSTOM_TRIGGER:
             final_room = st.text_input(
@@ -206,24 +216,28 @@ else:
 
     else:
         final_room = ""
-        # 動態選單：選擇事奉崗位（包含自訂選項）
-        # 下拉選單：請選擇事奉崗位
-sel_role = st.selectbox("請選擇事奉崗位", dynamic_roles)
-
-# 判斷：只有當選擇「其他 / 請自行於下方輸入」時，才會展開輸入框
-if sel_role == c.OTHER_CUSTOM_TRIGGER:
-    role = st.text_input("自訂崗位名稱", placeholder="請輸入新崗位名稱...")
-else:
-    role = sel_role
+        # ----------------------------------------------------
+        # 【事奉崗位輸入區域】
+        # ----------------------------------------------------
+        sel_role = st.selectbox("請選擇事奉崗位", dynamic_roles)
+        if sel_role == c.OTHER_CUSTOM_TRIGGER:
+            role = st.text_input(
+                "自訂崗位名稱", placeholder="請輸入新崗位名稱..."
+            )
+        else:
+            role = sel_role
 
         content = st.text_input(
             "事奉/聚會內容摘要", placeholder="例如：主日敬拜聚會"
         )
         people = st.text_input(
-            "事奉同工姓名", placeholder="例如：陳大衛, 林雅各（多位請用逗號分開）"
+            "事奉同工姓名",
+            placeholder="例如：陳大衛, 林雅各（多位請用逗號分開）",
         )
         grace_notes = st.text_area(
-            "恩典體會 / 禱告事項 / 備註", placeholder="在此寫下服侍心得或禱告事項...", height=150
+            "恩典體會 / 禱告事項 / 備註",
+            placeholder="在此寫下服侍心得或禱告事項...",
+            height=150,
         )
 
     submit_button = st.form_submit_button(label="💾 儲存至雲端")
@@ -235,7 +249,7 @@ if submit_button:
     conflict_msg = []
 
     if not df_raw.empty:
-        # 場地衝突檢查
+        # 1. 場地衝突檢查
         if final_room.strip():
             same_room_time = df_raw[
                 (df_raw["service_date"] == date_str)
@@ -248,7 +262,7 @@ if submit_button:
                     f"⚠️ 場地衝突：場地 [{final_room.strip()}] 在 {date_str} {time_str} 已被預約！"
                 )
 
-        # 人員重複檢查
+        # 2. 人員重複檢查
         if people.strip():
             input_names = [
                 n.strip()
@@ -272,7 +286,7 @@ if submit_button:
                             f"⚠️ 人員衝突：同工 [{name}] 在 {date_str} {time_str} 已有其他事奉/借用紀錄！"
                         )
 
-        # 事奉崗位衝突檢查
+        # 3. 事奉崗位衝突檢查
         if selected_type_key == "SCHEDULE" and role.strip():
             same_time_role = df_raw[
                 (df_raw["service_date"] == date_str)
@@ -433,7 +447,7 @@ elif selected_tab == c.TABS[2]:
             if selected_key is not None:
                 f_row = df_g_disp.loc[selected_key]
                 st.info(
-                    f"詳細資訊：{f_row['日期']} {f_row['時間']} | {f_row['崗位']} | {f_row['所屬小組']}"
+                    f"詳細資訊：{f_row['日期']} {f_row['時間']} | {f_row['崗位']} | {f_row['小組']}"
                 )
                 st.write(f"同行同工：{f_row['同行同工']}")
                 st.write(f"事奉摘要：{f_row['摘要']}")

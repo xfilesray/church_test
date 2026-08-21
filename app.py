@@ -1,237 +1,249 @@
-import datetime
-import re
-import pandas as pd
+# app.py
+# ==========================================
+# Church Service Management & Grace Journal
+# Main Application
+# ==========================================
+
+import os
 import streamlit as st
+import pandas as pd
 from supabase import create_client, Client
 import constants as c
 
-# ------------------------------------------------------------------------------
-# 1. Page Configuration & Supabase Initialization
-# ------------------------------------------------------------------------------
+# ------------------------------------------
+# 1. Page & DB Initialization
+# ------------------------------------------
 st.set_page_config(
-    page_title=c.TITLE_APP,
-    page_icon="⛪",
+    page_title=c.PAGE_TITLE,
+    page_icon=c.PAGE_ICON,
     layout="wide"
 )
 
 @st.cache_resource
 def init_supabase() -> Client:
-    """Initialize Supabase client connection using secrets."""
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
+    """Initialize Supabase client using Streamlit secrets or environment variables."""
+    url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+    key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
+    
+    if not url or not key:
+        st.error("⚠️ Missing SUPABASE_URL or SUPABASE_KEY. Please set them in secrets.toml or environment variables.")
+        st.stop()
+        
     return create_client(url, key)
 
-try:
-    supabase = init_supabase()
-except Exception as err:
-    st.error(f"{c.ERR_DB_CONN}: {err}")
-    st.stop()
+supabase = init_supabase()
+TABLE_NAME = "church_records"
 
-# ------------------------------------------------------------------------------
-# 2. Helper Functions
-# ------------------------------------------------------------------------------
-def parse_names(name_string: str) -> list[str]:
-    """Parse string into a clean list of individual names (supports Chinese/English commas)."""
-    if not name_string:
-        return []
-    # Split by Chinese comma '，', English comma ',', or whitespace
-    raw_names = re.split(r'[,，\s]+', name_string)
-    return [name.strip() for name in raw_names if name.strip()]
+# ------------------------------------------
+# 2. Helper & Conflict Detection Logic
+# ------------------------------------------
+def parse_worker_names(worker_string: str) -> set:
+    """Parse comma-separated worker names into a normalized clean set."""
+    if not worker_string:
+        return set()
+    # Support both Chinese (，) and English (,) commas
+    normalized = worker_string.replace("，", ",")
+    return {name.strip().lower() for name in normalized.split(",") if name.strip()}
 
-def check_schedule_conflicts(event_date: str, group_name: str, new_volunteers: list[str]) -> list[str]:
-    """Check if any volunteer is already scheduled on the same date."""
-    if not new_volunteers:
-        return []
-    
-    response = supabase.table("schedules") \
-        .select("volunteers, group_name") \
-        .eq("event_date", event_date) \
-        .execute()
-    
+def check_conflicts(event_date: str, record_type: str, service_workers: str, venue_name: str, time_slot: str):
+    """
+    Checks database for potential roster or venue booking conflicts.
+    Returns: (worker_conflicts, venue_conflicts)
+    """
+    worker_conflicts = []
+    venue_conflicts = False
+
+    # Fetch existing records for the same date
+    response = supabase.table(TABLE_NAME).select("*").eq("event_date", event_date).execute()
     existing_records = response.data
-    conflicts = []
-    
-    for record in existing_records:
-        existing_volunteers = parse_names(record.get("volunteers", ""))
-        for person in new_volunteers:
-            if person in existing_volunteers:
-                conflicts.append(f"{person} ({c.LABEL_ALREADY_SCHEDULED}: {record.get('group_name')})")
-                
-    return conflicts
 
-def check_room_conflicts(event_date: str, time_slot: str, room_name: str) -> bool:
-    """Check if a room is already booked for the specified date and time slot."""
-    response = supabase.table("room_bookings") \
-        .select("id") \
-        .eq("event_date", event_date) \
-        .eq("time_slot", time_slot) \
-        .eq("room_name", room_name) \
-        .execute()
-    
-    return len(response.data) > 0
+    if not existing_records:
+        return worker_conflicts, venue_conflicts
 
-# ------------------------------------------------------------------------------
-# 3. UI Components & Layout
-# ------------------------------------------------------------------------------
-st.title(f"⛪ {c.TITLE_APP}")
-st.markdown(f"*{c.SUBTITLE_APP}*")
+    new_workers = parse_worker_names(service_workers)
 
-tabs = st.tabs([c.TAB_GRACE, c.TAB_SCHEDULE, c.TAB_ROOM, c.TAB_DATA_VIEW])
+    for rec in existing_records:
+        # 1. Check Service Roster Worker Conflict
+        if record_type == c.TYPE_SERVICE and rec.get("record_type") == c.TYPE_SERVICE:
+            exist_workers = parse_worker_names(rec.get("service_workers", ""))
+            overlap = new_workers.intersection(exist_workers)
+            if overlap:
+                for worker in overlap:
+                    worker_conflicts.append({
+                        "worker": worker,
+                        "existing_role": rec.get("service_role")
+                    })
 
-# ------------------------------------------------------------------------------
-# TAB 1: Grace & Reflection Diary
-# ------------------------------------------------------------------------------
-with tabs[0]:
-    st.subheader(c.HEADER_GRACE_FORM)
-    
-    with st.form("grace_form", clear_on_submit=True):
-        record_date = st.date_input(c.LABEL_DATE, value=datetime.date.today())
-        author = st.text_input(c.LABEL_AUTHOR)
-        
-        selected_category = st.selectbox(c.LABEL_CATEGORY, c.GRACE_CATEGORIES)
-        custom_category = ""
-        if selected_category == c.OPTION_OTHER:
-            custom_category = st.text_input(c.LABEL_CUSTOM_CATEGORY, key="grace_custom_cat")
+        # 2. Check Venue Booking Conflict
+        if record_type == c.TYPE_VENUE and rec.get("record_type") == c.TYPE_VENUE:
+            if rec.get("venue_name") == venue_name and rec.get("time_slot") == time_slot:
+                venue_conflicts = True
+
+    return worker_conflicts, venue_conflicts
+
+def insert_record(data: dict) -> bool:
+    """Inserts a record dictionary into Supabase database."""
+    try:
+        supabase.table(TABLE_NAME).insert(data).execute()
+        return True
+    except Exception as e:
+        st.error(f"{c.MSG_DB_ERROR} {str(e)}")
+        return False
+
+# ------------------------------------------
+# 3. UI - Sidebar Navigation
+# ------------------------------------------
+st.sidebar.title(c.NAV_HEADER)
+menu_choice = st.sidebar.radio("", [c.NAV_LABEL_FORM, c.NAV_LABEL_DATA])
+
+# ------------------------------------------
+# 4. View 1: Form Input
+# ------------------------------------------
+if menu_choice == c.NAV_LABEL_FORM:
+    st.title(f"{c.PAGE_ICON} {c.PAGE_TITLE}")
+    st.subheader(c.FORM_TITLE)
+
+    with st.form(key="church_record_form"):
+        st.markdown(f"### {c.SECTION_BASIC}")
+        col1, col2 = st.columns(2)
+        with col1:
+            event_date = st.date_input(c.LABEL_DATE)
+        with col2:
+            submitted_by = st.text_input(c.LABEL_USER)
+
+        st.markdown(f"### {c.SECTION_CATEGORY}")
+        record_type = st.selectbox(c.LABEL_RECORD_TYPE, c.RECORD_TYPES)
+
+        # Dynamic Variables
+        service_role = ""
+        service_workers = ""
+        venue_name = ""
+        time_slot = ""
+        contact_person = ""
+
+        # Dynamic Section: Service Roster
+        if record_type == c.TYPE_SERVICE:
+            selected_role = st.selectbox(c.LABEL_SERVICE_ROLE, c.SERVICE_ROSTER_OPTIONS)
+            if "其他" in selected_role:
+                service_role = st.text_input(c.LABEL_CUSTOM_ROLE)
+            else:
+                service_role = selected_role
             
-        content = st.text_area(c.LABEL_GRACE_CONTENT, height=150)
-        prayer_request = st.text_area(c.LABEL_PRAYER_REQUEST, height=100)
-        
-        submit_grace = st.form_submit_button(c.BTN_SUBMIT)
-        
-        if submit_grace:
-            final_category = custom_category.strip() if selected_category == c.OPTION_OTHER else selected_category
-            if not author or not content or (selected_category == c.OPTION_OTHER and not final_category):
-                st.error(c.ERR_REQUIRED_FIELDS)
+            service_workers = st.text_input(c.LABEL_SERVICE_WORKERS, help=c.HELP_SERVICE_WORKERS)
+
+        # Dynamic Section: Venue Booking
+        elif record_type == c.TYPE_VENUE:
+            selected_venue = st.selectbox(c.LABEL_VENUE_NAME, c.VENUE_OPTIONS)
+            if "其他" in selected_venue:
+                venue_name = st.text_input(c.LABEL_CUSTOM_VENUE)
             else:
-                payload = {
-                    "record_date": str(record_date),
-                    "author": author,
-                    "category": final_category,
-                    "content": content,
-                    "prayer_request": prayer_request
-                }
-                supabase.table("grace_diaries").insert(payload).execute()
-                st.success(c.MSG_SAVE_SUCCESS)
+                venue_name = selected_venue
 
-# ------------------------------------------------------------------------------
-# TAB 2: Future Ministry Scheduling
-# ------------------------------------------------------------------------------
-with tabs[1]:
-    st.subheader(c.HEADER_SCHEDULE_FORM)
-    
-    # Selection controls OUTSIDE form to trigger dynamic text input correctly
-    col1, col2 = st.columns(2)
-    with col1:
-        event_date = st.date_input(c.LABEL_EVENT_DATE, value=datetime.date.today(), key="sched_date")
-    with col2:
-        selected_group = st.selectbox(c.LABEL_GROUP, c.GROUP_OPTIONS, key="sched_group_select")
-        
-    custom_group = ""
-    if selected_group == c.OPTION_OTHER:
-        custom_group = st.text_input(c.LABEL_CUSTOM_GROUP, key="sched_custom_group")
-        
-    final_group_name = custom_group.strip() if selected_group == c.OPTION_OTHER else selected_group
+            time_slot = st.selectbox(c.LABEL_TIME_SLOT, c.TIME_SLOT_OPTIONS)
+            contact_person = st.text_input(c.LABEL_CONTACT_PERSON)
 
-    with st.form("schedule_form"):
-        volunteers_input = st.text_input(c.LABEL_VOLUNTEERS, help=c.HELP_VOLUNTEERS)
-        notes = st.text_input(c.LABEL_NOTES)
-        force_save = st.checkbox(c.LABEL_FORCE_SAVE)
-        
-        submit_schedule = st.form_submit_button(c.BTN_SUBMIT)
-        
-        if submit_schedule:
-            volunteers_list = parse_names(volunteers_input)
-            if not final_group_name or not volunteers_list:
-                st.error(c.ERR_REQUIRED_FIELDS)
-            else:
-                conflicts = check_schedule_conflicts(str(event_date), final_group_name, volunteers_list)
-                
-                if conflicts and not force_save:
-                    st.error(f"{c.ERR_SCHEDULE_CONFLICT}: {', '.join(conflicts)}")
-                    st.warning(c.WARN_FORCE_SAVE_HINT)
-                else:
-                    payload = {
-                        "event_date": str(event_date),
-                        "group_name": final_group_name,
-                        "volunteers": ", ".join(volunteers_list),
-                        "notes": notes
-                    }
-                    supabase.table("schedules").insert(payload).execute()
-                    st.success(c.MSG_SAVE_SUCCESS)
+        # Common Content Field
+        content = st.text_area(c.LABEL_CONTENT, height=120)
 
-# ------------------------------------------------------------------------------
-# TAB 3: Room / Venue Booking
-# ------------------------------------------------------------------------------
-with tabs[2]:
-    st.subheader(c.HEADER_ROOM_FORM)
-    
-    col_r1, col_r2 = st.columns(2)
-    with col_r1:
-        booking_date = st.date_input(c.LABEL_EVENT_DATE, value=datetime.date.today(), key="room_date")
-        time_slot = st.selectbox(c.LABEL_TIME_SLOT, c.TIME_SLOTS)
-    with col_r2:
-        selected_room = st.selectbox(c.LABEL_ROOM, c.ROOM_OPTIONS, key="room_select")
-        custom_room = ""
-        if selected_room == c.OPTION_OTHER:
-            custom_room = st.text_input(c.LABEL_CUSTOM_ROOM, key="room_custom_input")
+        submit_button = st.form_submit_button(label=c.BTN_SUBMIT)
 
-    final_room_name = custom_room.strip() if selected_room == c.OPTION_OTHER else selected_room
-
-    with st.form("room_booking_form"):
-        applicant = st.text_input(c.LABEL_APPLICANT)
-        purpose = st.text_input(c.LABEL_PURPOSE)
-        force_save_room = st.checkbox(c.LABEL_FORCE_SAVE, key="force_room")
-        
-        submit_room = st.form_submit_button(c.BTN_SUBMIT)
-        
-        if submit_room:
-            if not final_room_name or not applicant:
-                st.error(c.ERR_REQUIRED_FIELDS)
-            else:
-                is_conflicted = check_room_conflicts(str(booking_date), time_slot, final_room_name)
-                
-                if is_conflicted and not force_save_room:
-                    st.error(c.ERR_ROOM_CONFLICT)
-                    st.warning(c.WARN_FORCE_SAVE_HINT)
-                else:
-                    payload = {
-                        "event_date": str(booking_date),
-                        "time_slot": time_slot,
-                        "room_name": final_room_name,
-                        "applicant": applicant,
-                        "purpose": purpose
-                    }
-                    supabase.table("room_bookings").insert(payload).execute()
-                    st.success(c.MSG_SAVE_SUCCESS)
-
-# ------------------------------------------------------------------------------
-# TAB 4: Data Search & Overview
-# ------------------------------------------------------------------------------
-with tabs[3]:
-    st.subheader(c.HEADER_DATA_VIEW)
-    
-    dataset_type = st.radio(c.LABEL_SELECT_DATASET, [c.DATASET_GRACE, c.DATASET_SCHEDULE, c.DATASET_ROOM], horizontal=True)
-    search_keyword = st.text_input(c.LABEL_SEARCH_KEYWORD)
-    
-    table_map = {
-        c.DATASET_GRACE: "grace_diaries",
-        c.DATASET_SCHEDULE: "schedules",
-        c.DATASET_ROOM: "room_bookings"
-    }
-    
-    target_table = table_map[dataset_type]
-    data_response = supabase.table(target_table).select("*").order("created_at", desc=True).execute()
-    
-    if data_response.data:
-        df = pd.DataFrame(data_response.data)
-        
-        # Keyword filtering across all text columns
-        if search_keyword:
-            mask = df.astype(str).apply(lambda row: row.str.contains(search_keyword, case=False).any(), axis=1)
-            df = df[mask]
+    # Submission Logic & Conflict Validation
+    if submit_button:
+        # Validation
+        if not submitted_by or not content:
+            st.error(c.MSG_MISSING_FIELDS)
+        else:
+            str_date = str(event_date)
             
-        # Rename columns using constants mapping for presentation
-        df_display = df.rename(columns=c.COLUMN_MAPPINGS.get(target_table, {}))
-        st.dataframe(df_display, use_container_width=True)
-    else:
-        st.info(c.MSG_NO_DATA)
+            # Conflict Check
+            worker_conflicts, venue_conflicts = check_conflicts(
+                str_date, record_type, service_workers, venue_name, time_slot
+            )
+
+            record_payload = {
+                "event_date": str_date,
+                "submitted_by": submitted_by,
+                "record_type": record_type,
+                "content": content,
+                "service_role": service_role,
+                "service_workers": service_workers,
+                "venue_name": venue_name,
+                "time_slot": time_slot,
+                "contact_person": contact_person
+            }
+
+            has_conflict = False
+
+            if worker_conflicts:
+                has_conflict = True
+                st.warning(c.WARN_WORKER_CONFLICT)
+                for item in worker_conflicts:
+                    st.write(f"- 同工 **{item['worker'].title()}** 在同日已有崗位：`{item['existing_role']}`")
+
+            if venue_conflicts:
+                has_conflict = True
+                st.error(f"{c.WARN_VENUE_CONFLICT} **{venue_name}** 在 `{str_date}` 的 `{time_slot}` 時段已被預約！")
+
+            if has_conflict:
+                st.session_state["pending_record"] = record_payload
+            else:
+                if insert_record(record_payload):
+                    st.success(c.MSG_SUCCESS)
+
+    # Force Save Option (Triggered if conflicts exist)
+    if "pending_record" in st.session_state and st.session_state["pending_record"]:
+        st.divider()
+        st.info("若此為特殊聯合聚會或已知特例，您可以選擇強制儲存：")
+        if st.button(c.BTN_FORCE_SAVE):
+            if insert_record(st.session_state["pending_record"]):
+                st.success(c.MSG_FORCE_SUCCESS)
+                st.session_state["pending_record"] = None
+
+# ------------------------------------------
+# 5. View 2: Data Query & Dashboard
+# ------------------------------------------
+elif menu_choice == c.NAV_LABEL_DATA:
+    st.title(f"{c.PAGE_ICON} {c.NAV_LABEL_DATA}")
+
+    try:
+        response = supabase.table(TABLE_NAME).select("*").order("event_date", desc=True).execute()
+        records = response.data
+
+        if not records:
+            st.info(c.MSG_NO_DATA)
+        else:
+            df = pd.DataFrame(records)
+
+            # Filtering & Search Controls
+            col_filter1, col_filter2 = st.columns(2)
+            with col_filter1:
+                filter_type = st.multiselect("篩選紀錄類型", c.RECORD_TYPES, default=c.RECORD_TYPES)
+            with col_filter2:
+                search_query = st.text_input("🔍 搜尋關鍵字 (同工姓名/場地/內容)", "")
+
+            # Apply Type Filter
+            if filter_type:
+                df = df[df["record_type"].isin(filter_type)]
+
+            # Apply Keyword Search Across Dataframe
+            if search_query:
+                search_mask = df.astype(str).apply(
+                    lambda row: row.str.contains(search_query, case=False, na=False)
+                ).any(axis=1)
+                df = df[search_mask]
+
+            # Reorder & Drop Internal Unneeded Columns
+            columns_order = [
+                "event_date", "submitted_by", "record_type", "service_role", 
+                "service_workers", "venue_name", "time_slot", "contact_person", "content"
+            ]
+            existing_cols = [col for col in columns_order if col in df.columns]
+            df = df[existing_cols]
+
+            # Rename Columns to Traditional Chinese
+            df_display = df.rename(columns=c.COLUMN_MAP)
+
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+
+    except Exception as e:
+        st.error(f"{c.MSG_DB_ERROR} {str(e)}")

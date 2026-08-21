@@ -1,10 +1,11 @@
 # app.py
 # ==========================================
 # Church Service Management & Grace Journal
-# Main Application
+# Main Application (With Date & Time Support)
 # ==========================================
 
 import os
+from datetime import time
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
@@ -87,14 +88,13 @@ def insert_record(data: dict) -> bool:
         return False
 
 # ------------------------------------------
-# 3. Sidebar Navigation (選單強化版)
+# 3. Sidebar Navigation
 # ------------------------------------------
 with st.sidebar:
     st.image("https://img.icons8.com/isometric/100/church.png", width=80)
     st.title(c.NAV_HEADER)
     st.markdown("---")
     
-    # 採用帶有預設 key 的 radio 確保選單渲染與狀態維持
     menu_choice = st.radio(
         label="功能頁面切換",
         options=[c.NAV_LABEL_FORM, c.NAV_LABEL_DATA],
@@ -106,7 +106,7 @@ with st.sidebar:
     st.caption("⛪ 教會事奉管理系統 v2.0")
 
 # ------------------------------------------
-# 4. View 1: Form Input (新增資料)
+# 4. View 1: Form Input (新增資料表單)
 # ------------------------------------------
 if menu_choice == c.NAV_LABEL_FORM:
     st.title(f"{c.PAGE_ICON} {c.PAGE_TITLE}")
@@ -116,6 +116,7 @@ if menu_choice == c.NAV_LABEL_FORM:
         st.markdown(f"### {c.SECTION_BASIC}")
         col1, col2 = st.columns(2)
         with col1:
+            # 日期選擇器
             event_date = st.date_input(c.LABEL_DATE)
         with col2:
             submitted_by = st.text_input(c.LABEL_USER)
@@ -128,9 +129,11 @@ if menu_choice == c.NAV_LABEL_FORM:
         service_workers = ""
         venue_name = ""
         time_slot = ""
+        start_time_str = ""
+        end_time_str = ""
         contact_person = ""
 
-        # Dynamic Section: Service Roster
+        # Dynamic Section: Service Roster (事奉排班)
         if record_type == c.TYPE_SERVICE:
             selected_role = st.selectbox(c.LABEL_SERVICE_ROLE, c.SERVICE_ROSTER_OPTIONS)
             if "其他" in selected_role:
@@ -140,7 +143,7 @@ if menu_choice == c.NAV_LABEL_FORM:
             
             service_workers = st.text_input(c.LABEL_SERVICE_WORKERS, help=c.HELP_SERVICE_WORKERS)
 
-        # Dynamic Section: Venue Booking
+        # Dynamic Section: Venue Booking (場地借用 - 包含時間選擇)
         elif record_type == c.TYPE_VENUE:
             selected_venue = st.selectbox(c.LABEL_VENUE_NAME, c.VENUE_OPTIONS)
             if "其他" in selected_venue:
@@ -148,7 +151,25 @@ if menu_choice == c.NAV_LABEL_FORM:
             else:
                 venue_name = selected_venue
 
-            time_slot = st.selectbox(c.LABEL_TIME_SLOT, c.TIME_SLOT_OPTIONS)
+            # 提供「預設時段」與「自訂時間」雙模式
+            time_option = st.radio(
+                c.LABEL_TIME_OPTION, 
+                [c.TIME_OPTION_SLOT, c.TIME_OPTION_CUSTOM],
+                horizontal=True
+            )
+
+            if time_option == c.TIME_OPTION_SLOT:
+                time_slot = st.selectbox(c.LABEL_TIME_SLOT, c.TIME_SLOT_OPTIONS)
+            else:
+                t_col1, t_col2 = st.columns(2)
+                with t_col1:
+                    start_t = st.time_input(c.LABEL_START_TIME, time(9, 0))
+                with t_col2:
+                    end_t = st.time_input(c.LABEL_END_TIME, time(11, 0))
+                start_time_str = start_t.strftime("%H:%M")
+                end_time_str = end_t.strftime("%H:%M")
+                time_slot = f"{start_time_str} - {end_time_str}"
+
             contact_person = st.text_input(c.LABEL_CONTACT_PERSON)
 
         # Common Content Field
@@ -176,6 +197,8 @@ if menu_choice == c.NAV_LABEL_FORM:
                 "service_workers": service_workers,
                 "venue_name": venue_name,
                 "time_slot": time_slot,
+                "start_time": start_time_str if start_time_str else None,
+                "end_time": end_time_str if end_time_str else None,
                 "contact_person": contact_person
             }
 
@@ -207,7 +230,7 @@ if menu_choice == c.NAV_LABEL_FORM:
                 st.session_state["pending_record"] = None
 
 # ------------------------------------------
-# 5. View 2: Data Query & Dashboard (資料管理)
+# 5. View 2: Data Query & Dashboard (資料查詢)
 # ------------------------------------------
 elif menu_choice == c.NAV_LABEL_DATA:
     st.title(f"{c.PAGE_ICON} {c.NAV_LABEL_DATA}")
@@ -226,7 +249,7 @@ elif menu_choice == c.NAV_LABEL_DATA:
             with col_filter1:
                 filter_type = st.multiselect("篩選紀錄類型", c.RECORD_TYPES, default=c.RECORD_TYPES)
             with col_filter2:
-                search_query = st.text_input("🔍 全文搜尋關鍵字 (同工姓名 / 場地 / 內容)", "")
+                search_query = st.text_input("🔍 全文搜尋關鍵字 (日期/同工/場地/內容)", "")
 
             if filter_type:
                 df = df[df["record_type"].isin(filter_type)]
@@ -239,8 +262,8 @@ elif menu_choice == c.NAV_LABEL_DATA:
 
             # Reorder Columns
             columns_order = [
-                "event_date", "submitted_by", "record_type", "service_role", 
-                "service_workers", "venue_name", "time_slot", "contact_person", "content"
+                "event_date", "time_slot", "submitted_by", "record_type", "service_role", 
+                "service_workers", "venue_name", "contact_person", "content"
             ]
             existing_cols = [col for col in columns_order if col in df.columns]
             df = df[existing_cols]

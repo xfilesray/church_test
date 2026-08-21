@@ -244,83 +244,119 @@ with tab_roster:
 with tab_search:
     st.header(c.LABELS["search_header"])
     
-    # 在 Module D 內部建立子分頁，包含同工管理
-    tab_query, tab_worker_mgmt = st.tabs([
-        "🔍 紀錄查詢", 
-        c.LABELS["tab_worker_mgmt"]
+    # 建立內部分頁
+    subtab_query, subtab_worker_mgmt = st.tabs([
+        c.LABELS["subtab_query"],
+        c.LABELS["subtab_worker_mgmt"]
     ])
     
-    # ------------------------------------------
-    # 子分頁 1：原有的紀錄查詢邏輯
-    # ------------------------------------------
-    with tab_query:
-        # [保留原有的恩典、場地、排班查詢表格邏輯]
-        pass
-
-    # ------------------------------------------
-    # 子分頁 2：同工名單管理 (Worker Management)
-    # ------------------------------------------
-    with tab_worker_mgmt:
-        st.subheader(c.LABELS["worker_mgmt_header"])
+    # ==========================================
+    # Subtab 1: 紀錄查詢
+    # ==========================================
+    with subtab_query:
+        col1, col2 = st.columns([1, 2])
         
-        # 1. 手動新增同工區塊
-        with st.expander("➕ 新增同工", expanded=False):
-            with st.form("add_worker_form", clear_on_submit=True):
-                new_worker_name = st.text_input("同工姓名：")
-                submit_add_worker = st.form_submit_button("新增同工")
-                
-                if submit_add_worker:
-                    if new_worker_name.strip():
-                        try:
-                            db.add_church_worker(new_worker_name.strip())
-                            st.success(f"✅ 成功新增同工：{new_worker_name.strip()}")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"❌ 新增失敗：{e}")
-                    else:
-                        st.warning("⚠️ 請輸入同工姓名！")
-
-        # 2. 同工列表與動態狀態切換
-        try:
-            all_workers = db.fetch_all_church_workers()
+        with col1:
+            selected_module_key = st.selectbox(
+                c.LABELS["select_module"],
+                options=list(c.MODULE_OPTIONS.keys()),
+                format_func=lambda x: c.MODULE_OPTIONS[x]
+            )
+        
+        with col2:
+            search_kw = st.text_input(c.LABELS["search_keyword"], placeholder="輸入關鍵字...")
             
-            if not all_workers:
-                st.info("目前資料庫中尚無同工資料。")
-            else:
-                st.caption("提示：停用同工後，該同工將不會出現在排班選單中，但歷史排班紀錄仍會保留。")
+        col_date1, col_date2 = st.columns(2)
+        with col_date1:
+            start_d = st.date_input("開始日期", value=None)
+        with col_date2:
+            end_d = st.date_input("結束日期", value=None)
+            
+        if st.button(c.LABELS["btn_search"], type="primary", use_container_width=True):
+            # 映射表格名稱
+            table_map = {
+                "grace": "grace_records",
+                "venue": "venue_bookings",
+                "roster": "roster_schedules"
+            }
+            target_table = table_map.get(selected_module_key, "grace_records")
+            
+            # 執行查詢
+            df_result = db.query_records(
+                table_name=target_table, 
+                keyword=search_kw, 
+                start_date=start_d, 
+                end_date=end_d
+            )
+            
+            if not df_result.empty:
+                st.success(f"共找到 {len(df_result)} 筆符合資料：")
+                st.dataframe(df_result, use_container_width=True)
                 
-                # 以表格化清單呈現同工
-                for worker in all_workers:
-                    col_id, col_name, col_status, col_action, col_del = st.columns([1, 3, 2, 2, 2])
-                    
-                    with col_id:
-                        st.write(f"**#{worker['id']}**")
-                    
-                    with col_name:
-                        st.write(f"👤 {worker['name']}")
-                    
-                    with col_status:
-                        if worker['is_active']:
-                            st.success("🟢 啟用中")
-                        else:
-                            st.error("🔴 已停用")
-                    
-                    with col_action:
-                        # 切換啟用/停用按鈕
-                        toggle_label = "停用" if worker['is_active'] else "啟用"
-                        if st.button(toggle_label, key=f"btn_toggle_{worker['id']}"):
-                            db.update_worker_status(worker['id'], not worker['is_active'])
-                            st.toast(c.LABELS["msg_worker_updated"])
-                            st.rerun()
-                    
-                    with col_del:
-                        # 刪除按鈕
-                        if st.button("🗑️ 刪除", key=f"btn_del_{worker['id']}", type="secondary"):
-                            db.delete_worker(worker['id'])
-                            st.toast(c.LABELS["msg_worker_deleted"])
-                            st.rerun()
-                            
-                    st.divider()
+                # 下載 CSV 功能
+                csv_data = df_result.to_csv(index=False).encode("utf-8-sig")
+                st.download_button(
+                    label=c.LABELS["export_csv"],
+                    data=csv_data,
+                    file_name=f"{selected_module_key}_export_{datetime.date.today()}.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.warning(c.LABELS["no_data_found"])
 
-        except Exception as e:
-            st.error(f"⚠️ 載入同工名單失敗：{e}")
+    # ==========================================
+    # Subtab 2: 同工名單管理
+    # ==========================================
+    with subtab_worker_mgmt:
+        st.subheader(c.LABELS["add_worker_header"])
+        
+        with st.form("form_add_worker", clear_on_submit=True):
+            col_w1, col_w2 = st.columns(2)
+            with col_w1:
+                new_worker_name = st.text_input(c.LABELS["worker_name_input"])
+            with col_w2:
+                new_worker_role = st.text_input(c.LABELS["worker_role_select"], placeholder="例如：敬拜主領 / 音控")
+                
+            btn_add = st.form_submit_button(c.LABELS["btn_add_worker"])
+            
+            if btn_add:
+                if new_worker_name.strip():
+                    success = db.add_worker(new_worker_name, new_worker_role)
+                    if success:
+                        st.success(c.LABELS["msg_worker_added"])
+                        st.rerun()
+                else:
+                    st.error("請輸入同工姓名！")
+
+        st.divider()
+        st.subheader(c.LABELS["worker_list_header"])
+        
+        # 載入所有同工資料
+        df_workers = db.get_all_workers()
+        
+        if not df_workers.empty:
+            for idx, row in df_workers.iterrows():
+                with st.expander(f"👤 {row['name']} ({row.get('primary_role', '一般同工')}) - 目前狀態：{row['status']}"):
+                    col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
+                    
+                    with col_s1:
+                        selected_status = st.selectbox(
+                            "變更狀態",
+                            options=c.WORKER_STATUS_OPTIONS,
+                            index=c.WORKER_STATUS_OPTIONS.index(row['status']) if row['status'] in c.WORKER_STATUS_OPTIONS else 0,
+                            key=f"status_select_{row['id']}"
+                        )
+                    
+                    with col_s2:
+                        if st.button(c.LABELS["btn_update_status"], key=f"btn_upd_{row['id']}"):
+                            if db.update_worker_status(row['id'], selected_status):
+                                st.success(c.LABELS["msg_worker_updated"])
+                                st.rerun()
+                                
+                    with col_s3:
+                        if st.button(c.LABELS["btn_delete_worker"], key=f"btn_del_{row['id']}", type="secondary"):
+                            if db.delete_worker(row['id']):
+                                st.success(c.LABELS["msg_worker_deleted"])
+                                st.rerun()
+        else:
+            st.info("目前尚無同工資料，請利用上方表單新增。")

@@ -134,48 +134,64 @@ with tab_venue:
                         st.error(f"❌ 儲存失敗：{e}")
 
 # ------------------------------------------
-# Module C: 事奉時間表
+# Module C: Ministry Roster (動態 Supabase 同工選單版)
 # ------------------------------------------
 with tab_roster:
     st.header(c.LABELS["roster_header"])
     st.info(f"📍 當前排班時間：{selected_date} | {selected_time_slot}")
-    st.caption(c.LABELS["roster_hint"])
     
+    # 動態從 Supabase 取得最新同工名單
+    try:
+        db_workers = db.fetch_church_workers()
+    except Exception as e:
+        db_workers = []
+        st.error(f"⚠️ 無法載入同工名單：{e}")
+        
     with st.form("roster_form"):
+        st.subheader("👥 指派事奉崗位與同工")
+        
         col_r1, col_r2 = st.columns(2)
         
         with col_r1:
-            worship_lead = st.text_input(c.LABELS["worship_lead"])
-            speaker = st.text_input(c.LABELS["speaker"])
-            av_team = st.text_input(c.LABELS["av_team"])
-            
+            worship_lead = st.multiselect("🎤 敬拜主領 / 樂手", options=db_workers)
+            speaker = st.multiselect("📖 證道 / 講員", options=db_workers)
+            av_team = st.multiselect("🎧 音控 / 直播同工", options=db_workers)
+
         with col_r2:
-            usher_team = st.text_input(c.LABELS["usher_team"])
-            sunday_school = st.text_input(c.LABELS["sunday_school"])
-            other_roles = st.text_input(c.LABELS["other_roles"])
-            
-        force_save_roster = st.checkbox(c.LABELS["force_save_roster"])
+            usher_team = st.multiselect("🤝 招待 / 迎賓同工", options=db_workers)
+            sunday_school = st.multiselect("🎨 主日學老師", options=db_workers)
+            other_roles = st.multiselect("⛪ 其他事奉同工", options=db_workers)
         
+        # 自訂/新同工輸入欄位
+        custom_worker = st.text_input("➕ 若有新同工，請在此輸入（提交後將自動新增至資料庫，多人請用逗號分隔）：")
+        
+        force_save_roster = st.checkbox(c.LABELS["force_save_roster"])
         submit_roster = st.form_submit_button(c.LABELS["btn_save_roster"])
         
         if submit_roster:
-            def parse_names(input_str):
-                if not input_str:
-                    return []
-                return [name.strip() for name in input_str.replace("，", ",").split(",") if name.strip()]
-            
+            # 1. 解析自訂輸入的同工名單，並同步寫入 Supabase 資料庫
+            custom_workers_list = []
+            if custom_worker.strip():
+                raw_list = [w.strip() for w in custom_worker.replace("，", ",").split(",") if w.strip()]
+                for new_w in raw_list:
+                    try:
+                        db.add_church_worker(new_w)  # 自動寫入 church_workers 表
+                        custom_workers_list.append(new_w)
+                    except Exception as e:
+                        st.warning(f"無法同步新增同工 {new_w}：{e}")
+
+            # 2. 彙整所有被指派的同工名單
             all_assigned_workers = (
-                parse_names(worship_lead) + 
-                parse_names(speaker) + 
-                parse_names(av_team) + 
-                parse_names(usher_team) + 
-                parse_names(sunday_school) + 
-                parse_names(other_roles)
+                worship_lead + speaker + av_team + 
+                usher_team + sunday_school + other_roles + 
+                custom_workers_list
             )
             
+            # 3. 檢查單次排班內的重複指派
             seen = set()
             self_duplicates = [w for w in all_assigned_workers if w in seen or seen.add(w)]
             
+            # 4. 檢查 Supabase 資料庫跨紀錄重複排班
             db_conflicts = db.check_roster_conflict(
                 event_date=selected_date, 
                 time_slot=selected_time_slot, 
@@ -184,18 +200,20 @@ with tab_roster:
             
             all_conflicts = list(set(self_duplicates + db_conflicts))
             
+            # 5. 判斷阻擋或進行寫入
             if all_conflicts and not force_save_roster:
-                st.warning(f"⚠️ 重複排班提醒：同工 [{', '.join(all_conflicts)}] 在此時段被指派了多個崗位！若確認無誤請勾選強制儲存。")
+                st.warning(f"⚠️ 重複排班提醒：同工 [{', '.join(all_conflicts)}] 在此時段被重複指派！若確認無誤請勾選強制儲存。")
             else:
                 try:
                     roles_data = {
-                        "worship_lead": worship_lead,
-                        "speaker": speaker,
-                        "av_team": av_team,
-                        "usher_team": usher_team,
-                        "sunday_school": sunday_school,
-                        "other_roles": other_roles
+                        "worship_lead": ", ".join(worship_lead),
+                        "speaker": ", ".join(speaker),
+                        "av_team": ", ".join(av_team),
+                        "usher_team": ", ".join(usher_team),
+                        "sunday_school": ", ".join(sunday_school),
+                        "other_roles": ", ".join(other_roles + custom_workers_list)
                     }
+                    
                     db.save_ministry_roster(
                         event_date=selected_date,
                         time_slot=selected_time_slot,
@@ -203,10 +221,10 @@ with tab_roster:
                         all_workers=all_assigned_workers,
                         is_forced=force_save_roster
                     )
-                    st.success("✅ 事奉時間表已成功發布並存入資料庫！")
+                    st.success("✅ 事奉時間表已成功發布並寫入資料庫！")
+                    st.rerun()  # 重新載入頁面以即時刷新下拉選單
                 except Exception as e:
                     st.error(f"❌ 發布失敗：{e}")
-
 # ------------------------------------------
 # Module D: 🔍 查詢紀錄版面 (支援大小寫不限與多欄位搜尋)
 # ------------------------------------------

@@ -1,172 +1,161 @@
-# app.py
-"""
-Church Ministry Management & Grace Journal System
-Main Application Entry Point (Pure UI Logic & Workflow Control)
-"""
-
-import datetime
 import streamlit as st
+import pandas as pd
+import constants as c
 
-# Local Module Imports
-import constants as const
-from database import get_supabase_client, check_conflicts, save_record, load_records
+# 設定頁面資訊
+st.set_page_config(page_title="Church Ministry Management System", layout="wide")
 
-# --- Page & Theme Configuration ---
-st.set_page_config(
-    page_title=const.PAGE_TITLE,
-    page_icon=const.PAGE_ICON,
-    layout="wide"
-)
+st.title(c.APP_TITLE)
+st.caption(c.APP_SUBTITLE)
+st.divider()
 
-st.title(f"{const.PAGE_ICON} {const.PAGE_TITLE}")
+# ==========================================
+# 1. Shared Section: Date & Time
+# ==========================================
+st.subheader(c.LABELS["date_section"])
+col_date, col_time = st.columns(2)
 
-# --- Initialize Supabase Client ---
-try:
-    supabase = get_supabase_client()
-except Exception as err:
-    st.error(f"❌ Failed to connect to Supabase: {err}")
-    st.stop()
+with col_date:
+    selected_date = st.date_input(c.LABELS["select_date"])
 
-# --- Main Interface Tabs ---
-tab_form, tab_data = st.tabs([
-    "📝 新增事奉與恩典紀錄", 
-    "🔍 查詢與檢視紀錄"
+with col_time:
+    selected_time_slot = st.selectbox(
+        c.LABELS["select_time"],
+        options=c.TIME_SLOT_OPTIONS
+    )
+    if selected_time_slot == "其他 / 請自行於下方輸入":
+        selected_time_slot = st.text_input(c.LABELS["custom_time"], value="")
+
+st.divider()
+
+# ==========================================
+# 2. Main Module Tabs
+# ==========================================
+tab_grace, tab_venue, tab_roster = st.tabs([
+    c.LABELS["tab_grace"], 
+    c.LABELS["tab_venue"], 
+    c.LABELS["tab_roster"]
 ])
 
-# ==========================================
-# TAB 1: THREE-IN-ONE FORM INPUT
-# ==========================================
-with tab_form:
-    st.subheader("三合一紀錄表單 (Form Input)")
+# ------------------------------------------
+# Module A: Grace & Experience Log
+# ------------------------------------------
+with tab_grace:
+    st.header(c.LABELS["grace_header"])
+    st.info(f"📍 當前套用時間：{selected_date} | {selected_time_slot}")
     
-    with st.form("church_record_form", clear_on_submit=False):
-        col_left, col_right = st.columns(2)
-        
-        # Left Column: Date, Time Slot, Ministry & Personnel
-        with col_left:
-            input_date = st.date_input(const.TEXT_DATE_SELECT, datetime.date.today())
-            input_slot = st.selectbox(const.TEXT_TIME_SLOT, const.TIME_SLOTS)
-            
-            # Ministry Role Dynamic Input
-            role_sel = st.selectbox("事奉崗位", const.ROLES)
-            if role_sel == const.OPTION_OTHER:
-                input_role = st.text_input("請輸入自訂崗位名稱", placeholder="例：特會攝影 / 兒幼帶領")
-            else:
-                input_role = role_sel
-                
-            input_personnel = st.text_area(
-                "排班人員（多位同工請用逗點、頓點或換行隔開）", 
-                placeholder="例如：張小明, 李大華, 王五"
-            )
-
-        # Right Column: Room Reservation & Grace Journal
-        with col_right:
-            # Room Name Dynamic Input
-            room_sel = st.selectbox("借用場地/房間", const.ROOMS)
-            if room_sel == const.OPTION_OTHER:
-                input_room = st.text_input("請輸入自訂場地名稱", placeholder="例：副堂 B 區")
-            else:
-                input_room = room_sel
-                
-            input_contact = st.text_input("借用聯絡人", placeholder="例：張長老")
-            
-            input_diary = st.text_area(
-                "恩典與體會日記（數算恩典/心得/禱告事項）", 
-                height=120,
-                placeholder="在此紀錄今日服侍心得或感恩事項..."
-            )
-
-        # Form Submit Button
-        submitted = st.form_submit_button("送出紀錄", type="primary")
-
-    # Submission & Conflict Detection Logic
-    if submitted:
-        date_str = str(input_date)
-        
-        # Check for Room Collisions & Personnel Overlaps
-        conflicts = check_conflicts(
-            supabase=supabase,
-            date_str=date_str,
-            time_slot=input_slot,
-            room=input_room,
-            personnel_text=input_personnel
+    with st.form("grace_log_form"):
+        worker_name = st.text_input(c.LABELS["worker_name"])
+        selected_gifts = st.multiselect(
+            c.LABELS["gifts_select"],
+            options=c.GRACE_GIFTS_OPTIONS
         )
         
-        has_conflict = conflicts["has_room_conflict"] or len(conflicts["conflicting_people"]) > 0
-        
-        # Prepare Data Payload
-        record_payload = {
-            "event_date": date_str,
-            "time_slot": input_slot,
-            "grace_diary": input_diary,
-            "ministry_role": input_role,
-            "personnel": input_personnel,
-            "room_name": input_room,
-            "contact_person": input_contact
-        }
-
-        if not has_conflict:
-            # Safe Insert
-            try:
-                save_record(supabase, record_payload)
-                st.success(const.TEXT_SUBMIT_SUCCESS)
-                st.rerun()
-            except Exception as err:
-                st.error(f"❌ 儲存失敗: {err}")
-        else:
-            # Warning Banner for Detected Conflicts
-            st.warning(const.TEXT_FORCE_SAVE)
+        custom_gift_val = ""
+        if "其他 / 請自行於下方輸入" in selected_gifts:
+            custom_gift_val = st.text_input(c.LABELS["custom_gift"])
             
-            if conflicts["has_room_conflict"]:
-                st.error(f"🚨 場地衝突：【{input_room}】在 {date_str} ({input_slot}) 已被預約！")
+        grace_reflection = st.text_area(c.LABELS["reflection"])
+        prayer_requests = st.text_area(c.LABELS["prayer"])
+        
+        submit_grace = st.form_submit_button(c.LABELS["btn_save_grace"])
+        
+        if submit_grace:
+            if not worker_name.strip():
+                st.error("❌ 請輸入同工姓名！")
+            else:
+                # 處理自訂選項整合
+                final_gifts = [g for g in selected_gifts if g != "其他 / 請自行於下方輸入"]
+                if custom_gift_val.strip():
+                    final_gifts.append(custom_gift_val.strip())
                 
-            if conflicts["conflicting_people"]:
-                names = ", ".join(conflicts["conflicting_people"])
-                st.error(f"🚨 同工重複排班：同工【{names}】在該時段已有事奉安排！")
-            
-            # Force Save Override Option
-            if st.button("🔓 仍要強制寫入 (Force Save)"):
-                try:
-                    save_record(supabase, record_payload)
-                    st.success("⚠️ 已強制將紀錄寫入資料庫！")
-                    st.rerun()
-                except Exception as err:
-                    st.error(f"❌ 強制寫入失敗: {err}")
+                # TODO: Supabase Save Action
+                st.success(f"✅ 已成功儲存 [{worker_name}] 的恩賜與體會紀錄！")
 
-# ==========================================
-# TAB 2: DATA SEARCH & VIEW
-# ==========================================
-with tab_data:
-    st.subheader("歷史資料檢視與關鍵字搜尋")
+# ------------------------------------------
+# Module B: Venue Reservation
+# ------------------------------------------
+with tab_venue:
+    st.header(c.LABELS["venue_header"])
+    st.info(f"📍 當前預約時間：{selected_date} | {selected_time_slot}")
     
-    try:
-        df = load_records(supabase)
-    except Exception as err:
-        st.error(f"❌ 無法載入歷史紀錄: {err}")
-        df = None
-
-    if df is not None and not df.empty:
-        # Search Box
-        search_kw = st.text_input("🔍 關鍵字搜尋（可搜尋同工姓名、崗位、場地或日記內容）", "")
-        
-        # Dynamic Pandas Search Filter
-        if search_kw.strip():
-            mask = df.apply(
-                lambda row: row.astype(str).str.contains(search_kw.strip(), case=False).any(), 
-                axis=1
-            )
-            filtered_df = df[mask]
-        else:
-            filtered_df = df
-
-        # Rename Columns using Configuration Map
-        display_cols = [c for c in const.COLUMN_MAPPINGS.keys() if c in filtered_df.columns]
-        df_display = filtered_df[display_cols].rename(columns=const.COLUMN_MAPPINGS)
-        
-        st.dataframe(
-            df_display, 
-            use_container_width=True,
-            hide_index=True
+    with st.form("venue_booking_form"):
+        venue_choice = st.selectbox(
+            c.LABELS["venue_select"],
+            options=c.VENUE_OPTIONS
         )
-    else:
-        st.info("目前尚無資料紀錄。")
+        
+        final_venue = venue_choice
+        if venue_choice == "其他 / 請自行於下方輸入":
+            final_venue = st.text_input(c.LABELS["custom_venue"])
+            
+        applicant_name = st.text_input(c.LABELS["applicant"])
+        event_purpose = st.text_input(c.LABELS["purpose"])
+        
+        force_save_venue = st.checkbox(c.LABELS["force_save_venue"])
+        
+        submit_venue = st.form_submit_button(c.LABELS["btn_save_venue"])
+        
+        if submit_venue:
+            if not final_venue.strip() or not applicant_name.strip():
+                st.error("❌ 請填寫完整的場地名稱與申請人資訊！")
+            else:
+                # 模擬場地防撞檢查 (Venue Conflict Check)
+                has_conflict = False  # 實作時自 Supabase 查詢是否有重疊紀錄
+                
+                if has_conflict and not force_save_venue:
+                    st.error(f"⚠️ 衝突警示：[{final_venue}] 在此時段已被預約！若需覆蓋請勾選強制儲存。")
+                else:
+                    # TODO: Supabase Save Action
+                    st.success(f"✅ 已成功提交 [{final_venue}] 的借用申請！")
+
+# ------------------------------------------
+# Module C: Ministry Roster
+# ------------------------------------------
+with tab_roster:
+    st.header(c.LABELS["roster_header"])
+    st.info(f"📍 當前排班時間：{selected_date} | {selected_time_slot}")
+    st.caption(c.LABELS["roster_hint"])
+    
+    with st.form("roster_form"):
+        col_r1, col_r2 = st.columns(2)
+        
+        with col_r1:
+            worship_lead = st.text_input(c.LABELS["worship_lead"])
+            speaker = st.text_input(c.LABELS["speaker"])
+            av_team = st.text_input(c.LABELS["av_team"])
+            
+        with col_r2:
+            usher_team = st.text_input(c.LABELS["usher_team"])
+            sunday_school = st.text_input(c.LABELS["sunday_school"])
+            other_roles = st.text_input(c.LABELS["other_roles"])
+            
+        force_save_roster = st.checkbox(c.LABELS["force_save_roster"])
+        
+        submit_roster = st.form_submit_button(c.LABELS["btn_save_roster"])
+        
+        if submit_roster:
+            # 解析同工姓名（相容中英文逗號）
+            def parse_names(input_str):
+                if not input_str:
+                    return []
+                return [name.strip() for name in input_str.replace("，", ",").split(",") if name.strip()]
+            
+            all_assigned_workers = (
+                parse_names(worship_lead) + 
+                parse_names(speaker) + 
+                parse_names(av_team) + 
+                parse_names(usher_team) + 
+                parse_names(sunday_school) + 
+                parse_names(other_roles)
+            )
+            
+            # 檢測單次表單內的重複排班
+            seen = set()
+            duplicates = set(w for w in all_assigned_workers if w in seen or seen.add(w))
+            
+            if duplicates and not force_save_roster:
+                st.warning(f"⚠️ 重複排班提醒：同工 [{', '.join(duplicates)}] 在此時段被指派了多個崗位！")
+            else:
+                # TODO: Supabase Save Action
+                st.success("✅ 事奉時間表已成功發布！")

@@ -3,15 +3,6 @@ import pandas as pd
 import constants as c
 import database as db
 
-# 範例 B：場地借用提交
-if submit_venue:
-    has_conflict = db.check_venue_conflict(selected_date, selected_time_slot, final_venue)
-    if has_conflict and not force_save_venue:
-        st.error(f"⚠️ 衝突警示：[{final_venue}] 在此時段已被預約！若需覆蓋請勾選強制儲存。")
-    else:
-        db.save_venue_booking(selected_date, selected_time_slot, final_venue, applicant_name, event_purpose, force_save_venue)
-        st.success(f"✅ 已成功提交 [{final_venue}] 的借用申請！")
-        
 # 設定頁面資訊
 st.set_page_config(page_title="Church Ministry Management System", layout="wide")
 
@@ -74,13 +65,24 @@ with tab_grace:
             if not worker_name.strip():
                 st.error("❌ 請輸入同工姓名！")
             else:
-                # 處理自訂選項整合
+                # 1. 處理自訂選項整合
                 final_gifts = [g for g in selected_gifts if g != "其他 / 請自行於下方輸入"]
                 if custom_gift_val.strip():
                     final_gifts.append(custom_gift_val.strip())
                 
-                # TODO: Supabase Save Action
-                st.success(f"✅ 已成功儲存 [{worker_name}] 的恩賜與體會紀錄！")
+                # 2. 呼叫 database.py 寫入 Supabase
+                try:
+                    db.save_grace_log(
+                        event_date=selected_date,
+                        time_slot=selected_time_slot,
+                        worker_name=worker_name,
+                        gifts=final_gifts,
+                        reflection=grace_reflection,
+                        prayer=prayer_requests
+                    )
+                    st.success(f"✅ 已成功儲存 [{worker_name}] 的恩賜與體會紀錄！")
+                except Exception as e:
+                    st.error(f"❌ 儲存失敗：{e}")
 
 # ------------------------------------------
 # Module B: Venue Reservation
@@ -106,18 +108,33 @@ with tab_venue:
         
         submit_venue = st.form_submit_button(c.LABELS["btn_save_venue"])
         
-        if submit_venue:
+         if submit_venue:
             if not final_venue.strip() or not applicant_name.strip():
                 st.error("❌ 請填寫完整的場地名稱與申請人資訊！")
             else:
-                # 模擬場地防撞檢查 (Venue Conflict Check)
-                has_conflict = False  # 實作時自 Supabase 查詢是否有重疊紀錄
+                # 1. 查詢資料庫確認是否場地撞期
+                has_conflict = db.check_venue_conflict(
+                    event_date=selected_date, 
+                    time_slot=selected_time_slot, 
+                    venue_name=final_venue
+                )
                 
+                # 2. 若撞期且未勾選強制儲存，發出警示；否則寫入資料庫
                 if has_conflict and not force_save_venue:
                     st.error(f"⚠️ 衝突警示：[{final_venue}] 在此時段已被預約！若需覆蓋請勾選強制儲存。")
                 else:
-                    # TODO: Supabase Save Action
-                    st.success(f"✅ 已成功提交 [{final_venue}] 的借用申請！")
+                    try:
+                        db.save_venue_booking(
+                            event_date=selected_date,
+                            time_slot=selected_time_slot,
+                            venue_name=final_venue,
+                            applicant=applicant_name,
+                            purpose=event_purpose,
+                            is_forced=force_save_venue
+                        )
+                        st.success(f"✅ 已成功提交 [{final_venue}] 的借用申請！")
+                    except Exception as e:
+                        st.error(f"❌ 儲存失敗：{e}")
 
 # ------------------------------------------
 # Module C: Ministry Roster
@@ -145,7 +162,7 @@ with tab_roster:
         submit_roster = st.form_submit_button(c.LABELS["btn_save_roster"])
         
         if submit_roster:
-            # 解析同工姓名（相容中英文逗號）
+            # 1. 解析同工姓名（相容中英文逗號）
             def parse_names(input_str):
                 if not input_str:
                     return []
@@ -160,12 +177,39 @@ with tab_roster:
                 parse_names(other_roles)
             )
             
-            # 檢測單次表單內的重複排班
+            # 2. 檢測單表單內重複排班
             seen = set()
-            duplicates = set(w for w in all_assigned_workers if w in seen or seen.add(w))
+            self_duplicates = [w for w in all_assigned_workers if w in seen or seen.add(w)]
             
-            if duplicates and not force_save_roster:
-                st.warning(f"⚠️ 重複排班提醒：同工 [{', '.join(duplicates)}] 在此時段被指派了多個崗位！")
+            # 3. 檢測資料庫內跨紀錄重複排班
+            db_conflicts = db.check_roster_conflict(
+                event_date=selected_date, 
+                time_slot=selected_time_slot, 
+                worker_list=all_assigned_workers
+            )
+            
+            all_conflicts = list(set(self_duplicates + db_conflicts))
+            
+            # 4. 判斷是否阻擋或寫入
+            if all_conflicts and not force_save_roster:
+                st.warning(f"⚠️ 重複排班提醒：同工 [{', '.join(all_conflicts)}] 在此時段被指派了多個崗位！若確認無誤請勾選強制儲存。")
             else:
-                # TODO: Supabase Save Action
-                st.success("✅ 事奉時間表已成功發布！")
+                try:
+                    roles_data = {
+                        "worship_lead": worship_lead,
+                        "speaker": speaker,
+                        "av_team": av_team,
+                        "usher_team": usher_team,
+                        "sunday_school": sunday_school,
+                        "other_roles": other_roles
+                    }
+                    db.save_ministry_roster(
+                        event_date=selected_date,
+                        time_slot=selected_time_slot,
+                        roles_dict=roles_data,
+                        all_workers=all_assigned_workers,
+                        is_forced=force_save_roster
+                    )
+                    st.success("✅ 事奉時間表已成功發布並存入資料庫！")
+                except Exception as e:
+                    st.error(f"❌ 發布失敗：{e}")

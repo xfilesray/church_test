@@ -1,209 +1,244 @@
-# -*- coding: utf-8 -*-
-"""
-database.py - 處理 Supabase 資料庫連線、CRUD 操作與衝突檢測 logic
-"""
-
+# ==============================================================================
+# File: database.py
+# Description: Supabase client initialization, conflict checks, and CRUD queries.
+# ==============================================================================
 import os
-import pandas as pd
-import streamlit as st
+import datetime
+from typing import List, Dict, Any, Tuple
 from supabase import create_client, Client
 
-# 初始化 Supabase 連線 (從 secrets 或環境變數讀取)
-@st.cache_resource
-def init_supabase() -> Client:
-    url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-    key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
-    
-    if not url or not key:
-        st.error("❌ 未設定 Supabase URL 或 Key！請檢查 .streamlit/secrets.toml")
-        st.stop()
-        
-    return create_client(url, key)
+# 初始化 Supabase 客戶端 (優先從環境變數讀取)
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
-supabase = init_supabase()
+if not SUPABASE_URL or not SUPABASE_KEY:
+    try:
+        import streamlit as st
+        SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
+        SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
+    except Exception:
+        pass
 
-# ==========================================
-# 模組 A: 恩典與體會紀錄 (Grace Logs)
-# ==========================================
-def save_grace_log(event_date, time_slot, worker_name, gifts, reflection, prayer):
-    """新增恩典紀錄"""
-    data = {
-        "event_date": str(event_date),
-        "time_slot": time_slot,
-        "worker_name": worker_name,
-        "spiritual_gifts": gifts,
-        "reflection": reflection,
-        "prayer_requests": prayer
-    }
-    res = supabase.table("grace_logs").insert(data).execute()
-    return res
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if (SUPABASE_URL and SUPABASE_KEY) else None
 
-# ==========================================
-# 模組 B: 場地借用 (Venue Bookings & Conflicts)
-# ==========================================
-def check_venue_conflict(event_date, time_slot, venue_name):
-    """檢查同日期、同時間、同場地是否已被預約"""
-    res = supabase.table("venue_bookings") \
-        .select("*") \
-        .eq("event_date", str(event_date)) \
-        .eq("time_slot", time_slot) \
-        .eq("venue_name", venue_name) \
-        .execute()
-    
-    return len(res.data) > 0
 
-def save_venue_booking(event_date, time_slot, venue_name, applicant, purpose, is_forced=False):
-    """寫入場地預約"""
-    data = {
-        "event_date": str(event_date),
-        "time_slot": time_slot,
-        "venue_name": venue_name,
-        "applicant_name": applicant,
-        "event_purpose": purpose,
-        "is_forced": is_forced
-    }
-    res = supabase.table("venue_bookings").insert(data).execute()
-    return res
-
-# ==========================================
-# 模組 C: 事奉時間表 (Ministry Rosters & Conflicts)
-# ==========================================
-def check_roster_conflict(event_date, time_slot, worker_list):
-    """檢查同工在同一時段是否已在其他排班中被指派"""
-    if not worker_list:
+# ------------------------------------------------------------------------------
+# Common Utilities
+# ------------------------------------------------------------------------------
+def parse_workers_string(raw_input: str) -> List[str]:
+    """將中英文逗號分隔的同工字串解析為獨立姓名串列，並去除空白。"""
+    if not raw_input:
         return []
-        
-    # 查詢同日期同時間已存在的排班
-    res = supabase.table("ministry_rosters") \
-        .select("all_workers") \
-        .eq("event_date", str(event_date)) \
-        .eq("time_slot", time_slot) \
-        .execute()
-    
-    conflicted_workers = set()
-    for row in res.data:
-        existing_workers = row.get("all_workers") or []
-        for worker in worker_list:
-            if worker in existing_workers:
-                conflicted_workers.add(worker)
-                
-    return list(conflicted_workers)
+    normalized = raw_input.replace("，", ",")
+    return [name.strip() for name in normalized.split(",") if name.strip()]
 
-def save_ministry_roster(event_date, time_slot, roles_dict, all_workers, is_forced=False):
-    """儲存/更新事奉時間表"""
-    data = {
-        "event_date": str(event_date),
-        "time_slot": time_slot,
-        "worship_lead": roles_dict.get("worship_lead", ""),
-        "speaker": roles_dict.get("speaker", ""),
-        "av_team": roles_dict.get("av_team", ""),
-        "usher_team": roles_dict.get("usher_team", ""),
-        "sunday_school": roles_dict.get("sunday_school", ""),
-        "other_roles": roles_dict.get("other_roles", ""),
-        "all_workers": all_workers,
-        "is_forced": is_forced
-    }
-    res = supabase.table("ministry_rosters").insert(data).execute()
-    return res
-    
-# ------------------------------------------
-# Module D: Search Logic
-# ------------------------------------------
-def query_records(table_name: str, keyword: str = "", start_date=None, end_date=None) -> pd.DataFrame:
-    """跨模組動態查詢邏輯，支援 Python 端的 case=False 模糊比對與日期過濾"""
-    query = supabase.table(table_name).select("*")
-    
-    # 執行資料庫查詢
-    response = query.execute()
-    data = response.data
-    
-    if not data:
-        return pd.DataFrame()
-        
-    df = pd.DataFrame(data)
-    
-    # 日期區間過濾
-    date_col = "created_at" if "created_at" in df.columns else ("booking_date" if "booking_date" in df.columns else "service_date")
-    if date_col in df.columns and (start_date or end_date):
-        df[date_col] = pd.to_datetime(df[date_col]).dt.date
-        if start_date:
-            df = df[df[date_col] >= start_date]
-        if end_date:
-            df = df[df[date_col] <= end_date]
-            
-    # 全欄位關鍵字不限大小寫比對 (case=False)
-    if keyword.strip():
-        kw = keyword.strip().lower()
-        mask = df.astype(str).apply(lambda row: row.str.lower().str.contains(kw, na=False)).any(axis=1)
-        df = df[mask]
-        
-    return df
 
-# ------------------------------------------
-# Module D: Worker Management Logic
-# ------------------------------------------
-def get_all_workers() -> pd.DataFrame:
-    """取得完整同工清單"""
-    res = supabase.table("workers").select("*").order("name").execute()
-    return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+# ------------------------------------------------------------------------------
+# Module A: Grace Records
+# ------------------------------------------------------------------------------
+def insert_grace_record(worker_name: str, ministry_item: str, reflection: str, prayer_request: str = "") -> bool:
+    """寫入恩典紀錄"""
+    try:
+        data = {
+            "worker_name": worker_name,
+            "ministry_item": ministry_item,
+            "reflection": reflection,
+            "prayer_request": prayer_request
+        }
+        res = supabase.table("grace_records").insert(data).execute()
+        return len(res.data) > 0
+    except Exception as e:
+        print(f"Error inserting grace record: {e}")
+        return False
 
-def add_worker(name: str, primary_role: str, status: str = "在籍 (Active)") -> bool:
-    """新增同工紀錄"""
-    payload = {"name": name.strip(), "primary_role": primary_role, "status": status}
-    res = supabase.table("workers").insert(payload).execute()
-    return len(res.data) > 0
 
-def update_worker_status(worker_id: int, new_status: str) -> bool:
-    """更新指定同工狀態"""
-    res = supabase.table("workers").update({"status": new_status}).eq("id", worker_id).execute()
-    return len(res.data) > 0
-
-def delete_worker(worker_id: int) -> bool:
-    """刪除指定同工"""
-    res = supabase.table("workers").delete().eq("id", worker_id).execute()
-    return len(res.data) > 0
-
-# ==========================================
-# File: database.py
-# Section: Dynamic Church Workers Management
-# ==========================================
-
-def fetch_church_workers() -> list:
+# ------------------------------------------------------------------------------
+# Module B: Venue Bookings & Conflict Detection
+# ------------------------------------------------------------------------------
+def check_venue_conflict(venue_name: str, booking_date: datetime.date, start_time: datetime.time, end_time: datetime.time) -> bool:
     """
-    動態讀取所有在籍（啟用中）的同工名單，供 Module C 排班下拉選單使用
+    檢查場地預約時間衝突 (StartA < EndB AND EndA > StartB)
     """
     try:
-        # 查詢 workers 表格中 status 為在籍的同工
+        res = supabase.table("venue_bookings") \
+            .select("*") \
+            .eq("venue_name", venue_name) \
+            .eq("booking_date", booking_date.isoformat()) \
+            .execute()
+
+        for booking in res.data:
+            b_start = datetime.datetime.strptime(booking["start_time"], "%H:%M:%S").time()
+            b_end = datetime.datetime.strptime(booking["end_time"], "%H:%M:%S").time()
+
+            if start_time < b_end and end_time > b_start:
+                return True # 發現重疊衝突
+        return False
+    except Exception as e:
+        print(f"Error checking venue conflict: {e}")
+        return False
+
+
+def insert_venue_booking(venue_name: str, applicant_name: str, purpose: str, booking_date: datetime.date, start_time: datetime.time, end_time: datetime.time, notes: str = "") -> bool:
+    """寫入場地預約紀錄"""
+    try:
+        data = {
+            "venue_name": venue_name,
+            "applicant_name": applicant_name,
+            "purpose": purpose,
+            "booking_date": booking_date.isoformat(),
+            "start_time": start_time.strftime("%H:%M:%S"),
+            "end_time": end_time.strftime("%H:%M:%S"),
+            "notes": notes
+        }
+        res = supabase.table("venue_bookings").insert(data).execute()
+        return len(res.data) > 0
+    except Exception as e:
+        print(f"Error inserting venue booking: {e}")
+        return False
+
+
+# ------------------------------------------------------------------------------
+# Module C: Ministry Roster & Conflict Detection
+# ------------------------------------------------------------------------------
+def check_roster_conflicts(service_date: datetime.date, roles_map: Dict[str, List[str]]) -> Tuple[List[str], List[str]]:
+    """
+    同時檢查單次表單內重複指派與雲端資料庫同日跨紀錄衝突。
+    回傳: (self_conflicts, db_conflicts)
+    """
+    self_conflicts = []
+    db_conflicts = []
+
+    # 1. 檢查表單內部重複
+    worker_counts = {}
+    for role, workers in roles_map.items():
+        for worker in workers:
+            worker_counts[worker] = worker_counts.get(worker, 0) + 1
+            if worker_counts[worker] > 1 and worker not in self_conflicts:
+                self_conflicts.append(worker)
+
+    # 2. 檢查雲端資料庫跨紀錄衝突
+    try:
+        res = supabase.table("roster_schedules") \
+            .select("*") \
+            .eq("service_date", service_date.isoformat()) \
+            .execute()
+
+        all_input_workers = set([w for workers in roles_map.values() for w in workers])
+        
+        for record in res.data:
+            db_workers_in_record = set()
+            for col in ["worship_leader", "speaker", "sound_av", "usher", "sunday_school", "other_roles"]:
+                if record.get(col):
+                    db_workers_in_record.update(parse_workers_string(record[col]))
+            
+            overlap = all_input_workers.intersection(db_workers_in_record)
+            for w in overlap:
+                if w not in db_conflicts:
+                    db_conflicts.append(w)
+    except Exception as e:
+        print(f"Error checking roster conflicts: {e}")
+
+    return self_conflicts, db_conflicts
+
+
+def insert_roster_schedule(service_date: datetime.date, service_type: str, roles_map: Dict[str, str], notes: str = "", is_force_saved: bool = False) -> bool:
+    """寫入事奉排班紀錄"""
+    try:
+        data = {
+            "service_date": service_date.isoformat(),
+            "service_type": service_type,
+            "worship_leader": roles_map.get("worship_leader", ""),
+            "speaker": roles_map.get("speaker", ""),
+            "sound_av": roles_map.get("sound_av", ""),
+            "usher": roles_map.get("usher", ""),
+            "sunday_school": roles_map.get("sunday_school", ""),
+            "other_roles": roles_map.get("other_roles", ""),
+            "notes": notes,
+            "is_force_saved": is_force_saved
+        }
+        res = supabase.table("roster_schedules").insert(data).execute()
+        return len(res.data) > 0
+    except Exception as e:
+        print(f"Error inserting roster schedule: {e}")
+        return False
+
+
+# ------------------------------------------------------------------------------
+# Module D: Dynamic Worker Management & Global Search
+# ------------------------------------------------------------------------------
+def fetch_church_workers() -> List[str]:
+    """動態讀取所有在籍同工名單"""
+    try:
         res = supabase.table("workers") \
             .select("name") \
             .eq("status", "在籍 (Active)") \
             .order("name") \
             .execute()
-        
-        if res.data:
-            return [row["name"] for row in res.data if "name" in row]
-        return []
+        return [row["name"] for row in res.data] if res.data else []
     except Exception as e:
-        print(f"Error fetching church workers: {e}")
+        print(f"Error fetching workers: {e}")
         return []
 
-def add_church_worker(worker_name: str, primary_role: str = "一般同工") -> bool:
-    """
-    新增同工至資料庫（若已存在則不重複寫入）
-    """
-    if not worker_name or not worker_name.strip():
+
+def add_church_worker(name: str, primary_role: str = "一般同工") -> bool:
+    """新增同工至名單"""
+    if not name or not name.strip():
         return False
-    
-    clean_name = worker_name.strip()
     try:
-        payload = {
-            "name": clean_name,
-            "primary_role": primary_role,
-            "status": "在籍 (Active)"
-        }
-        # 使用 upsert 根據 name (UNIQUE 鍵) 避免主鍵衝突
+        payload = {"name": name.strip(), "primary_role": primary_role, "status": "在籍 (Active)"}
         res = supabase.table("workers").upsert(payload, on_conflict="name").execute()
         return len(res.data) > 0
     except Exception as e:
-        print(f"Error adding church worker: {e}")
+        print(f"Error adding worker: {e}")
         return False
+
+
+def fetch_all_workers_details() -> List[Dict[str, Any]]:
+    """取得所有同工完整明細"""
+    try:
+        res = supabase.table("workers").select("*").order("name").execute()
+        return res.data if res.data else []
+    except Exception as e:
+        print(f"Error fetching worker details: {e}")
+        return []
+
+
+def search_all_records(keyword: str, module_filter: str = "全部模組") -> Dict[str, List[Dict[str, Any]]]:
+    """
+    全欄位不限大小寫 (Case-Insensitive) 跨模組模糊搜尋
+    """
+    results = {"grace_records": [], "venue_bookings": [], "roster_schedules": []}
+    if not keyword or not keyword.strip():
+        return results
+
+    kw = keyword.strip()
+
+    try:
+        # 1. 搜尋恩典紀錄
+        if module_filter in ["全部模組", "恩典紀錄"]:
+            res = supabase.table("grace_records") \
+                .select("*") \
+                .or_(f"worker_name.ilike.%{kw}%,ministry_item.ilike.%{kw}%,reflection.ilike.%{kw}%,prayer_request.ilike.%{kw}%") \
+                .execute()
+            results["grace_records"] = res.data or []
+
+        # 2. 搜尋場地預約
+        if module_filter in ["全部模組", "場地預約"]:
+            res = supabase.table("venue_bookings") \
+                .select("*") \
+                .or_(f"venue_name.ilike.%{kw}%,applicant_name.ilike.%{kw}%,purpose.ilike.%{kw}%,notes.ilike.%{kw}%") \
+                .execute()
+            results["venue_bookings"] = res.data or []
+
+        # 3. 搜尋事奉排班
+        if module_filter in ["全部模組", "事奉排班"]:
+            res = supabase.table("roster_schedules") \
+                .select("*") \
+                .or_(f"service_type.ilike.%{kw}%,worship_leader.ilike.%{kw}%,speaker.ilike.%{kw}%,sound_av.ilike.%{kw}%,usher.ilike.%{kw}%,sunday_school.ilike.%{kw}%,other_roles.ilike.%{kw}%,notes.ilike.%{kw}%") \
+                .execute()
+            results["roster_schedules"] = res.data or []
+
+    except Exception as e:
+        print(f"Error during search: {e}")
+
+    return results

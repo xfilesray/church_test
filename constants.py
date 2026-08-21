@@ -1,80 +1,114 @@
-# ==============================================================================
-# File: constants.py
-# Description: Centralized I18n labels, options, and multi-language mappings.
-# ==============================================================================
+# -*- coding: utf-8 -*-
+"""
+constants.py - 集中管理繁體中文 UI 標籤、對照表與預設選項
+"""
 
-# ── UI 標籤與提示文字 (LABELS) ──
+# App 系統設定
+APP_TITLE = "⛪ 教會事奉管理與恩典紀錄系統"
+APP_SUBTITLE = "專為教會同工與團隊設計的一站式事奉排班、場地借用與恩典紀錄平台"
+
+# 共用時段選項
+TIME_SLOT_OPTIONS = [
+    "早堂 (08:00 - 10:00)",
+    "主日堂 (10:00 - 12:00)",
+    "午堂 (14:00 - 16:00)",
+    "晚堂 (19:00 - 21:00)",
+    "其他 / 請自行於下方輸入"
+]
+
+# 模組 A：事奉恩賜與體會
+GRACE_GIFTS_OPTIONS = [
+    "講道 / 分享",
+    "敬拜讚美 / 樂手",
+    "關懷代禱",
+    "影音 / 音控 / 直播",
+    "行政協調 / 總務",
+    "兒童主日學 / 青少年",
+    "招待 / 迎賓",
+    "其他 / 請自行於下方輸入"
+]
+
+# 模組 B：場地借用
+VENUE_OPTIONS = [
+    "大堂 (Main Sanctuary)",
+    "副堂 (Side Chapel)",
+    "101 教室",
+    "102 教室",
+    "舞蹈 / 小組室",
+    "其他 / 請自行於下方輸入"
+]
+
+# UI 文字標籤 (UI Labels)
 LABELS = {
-    # 系統標題
-    "app_title": "⛪ 教會事奉管理與恩典紀錄系統",
-    "app_caption": "整合恩典分享、場地預約防撞、事奉排班與跨欄位查詢管理",
-
-    # 主選單 Tabs
+    # ── 主選單 Tab 標籤 ──
     "tab_grace": "📖 恩典與體會紀錄",
     "tab_venue": "🏠 場地借用",
     "tab_roster": "📅 事奉排班時間表",
     "tab_search": "🔍 查詢紀錄與管理",
+    
+    "date_section": "📅 請選擇活動 / 事奉時間 (Shared Date & Time)",
+    "select_date": "選擇日期",
+    "select_time": "選擇時段",
+    "custom_time": "請輸入自訂時段",
+    
+    # Tab 1: 恩賜與體會
+    "tab_grace": "📖 紀錄事奉恩賜",
+    "grace_header": "📖 紀錄事奉恩賜與心得日記",
+    "worker_name": "同工姓名",
+    "gifts_select": "事奉恩賜 / 服侍項目",
+    "custom_gift": "請輸入自訂恩賜/項目",
+    "reflection": "恩典體會與心得紀錄",
+    "prayer": "代禱事項",
+    "btn_save_grace": "儲存恩賜紀錄",
+    
+    # Tab 2: 場地借用
+    "tab_venue": "🏠 借用場地",
+    "venue_header": "🏠 教會房間 / 場地借用申請",
+    "venue_select": "選擇借用場地 / 房間",
+    "custom_venue": "請輸入自訂場地名稱",
+    "applicant": "申請人 / 單位聯絡人",
+    "purpose": "事工 / 聚會用途",
+    "force_save_venue": "⚠️ 若有場地撞期，仍強制儲存 (Force Save)",
+    "btn_save_venue": "提交場地借用申請",
+    
+    # Tab 3: 排班時間表
+    "tab_roster": "📅 事奉時間表",
+    "roster_header": "📅 未來事奉時間表 (團隊排班)",
+    "worship_lead": "敬拜主領",
+    "speaker": "講員 / 證道",
+    "av_team": "音控 / 直播同工",
+    "usher_team": "招待 / 迎賓同工",
+    "sunday_school": "主日學老師",
+    "other_roles": "其他事奉同工",
+    "roster_hint": "💡 多位同工請用逗號（中英文皆可）分隔，例如：張弟兄, 李姊妹",
+    "force_save_roster": "⚠️ 若有重複排班警示，仍強制儲存 (Force Save)",
+    "btn_save_roster": "發布事奉時間表",
 
-    # 模組 A: 恩典與體會
-    "grace_header": "📖 恩典與體會紀錄",
-    "grace_worker_name": "👤 同工姓名",
-    "grace_ministry_item": "🎯 服侍恩賜 / 項目",
-    "grace_reflection": "💡 恩典與心得分享",
-    "grace_prayer_request": "🙏 代禱事項 (選填)",
-    "btn_save_grace": "💾 儲存恩典紀錄",
-    "grace_save_success": "✨ 恩典紀錄已成功儲存！",
-
-    # 模組 B: 場地借用
-    "venue_header": "🏠 場地預約與借用登記",
-    "venue_name": "🏛️ 借用場地",
-    "venue_applicant": "👤 申請人 / 事工單位",
-    "venue_purpose": "🎯 事工用途",
-    "venue_booking_date": "📅 借用日期",
-    "venue_start_time": "⏰ 開始時間",
-    "venue_end_time": "⏰ 結束時間",
-    "venue_notes": "📝 備註事項 (選填)",
-    "force_save_venue": "⚠️ 強制儲存預約 (忽視時間重疊衝突警示)",
-    "btn_save_venue": "💾 提交場地預約",
-    "venue_conflict_warning": "⚠️ 場地預約衝突：該場地在指定時段已有其他預約紀錄！",
-    "venue_time_error": "❌ 錯誤：結束時間必須晚於開始時間！",
-    "venue_save_success": "✅ 場地預約成功！",
-
-    # 模組 C: 事奉排班
-    "roster_header": "📅 事奉排班時間表",
-    "roster_service_date": "📅 主日 / 聚會日期",
-    "roster_service_type": "⛪ 聚會類型",
-    "roster_worship_leader": "🎤 敬拜主領 / 樂手",
-    "roster_speaker": "📖 證道 / 講員",
-    "roster_sound_av": "🎧 音控 / 直播同工",
-    "roster_usher": "🤝 招待 / 迎賓同工",
-    "roster_sunday_school": "🎨 主日學老師",
-    "roster_other_roles": "⛪ 其他事奉同工",
-    "custom_worker_input": "➕ 新增自訂同工 (多位請用中英文逗號分隔)",
-    "roster_notes": "📝 排班備註 (選填)",
-    "force_save_roster": "⚠️ 強制儲存排班 (許可同工重複排班 / 聯合聚會)",
-    "btn_save_roster": "💾 儲存排班紀錄",
-    "roster_self_conflict": "⚠️ 表單內重複：同工 [{workers}] 在同一天被指派了多個重複崗位！",
-    "roster_db_conflict": "⚠️ 雲端資料庫衝突：同工 [{workers}] 在 {date} 已有其他事奉排班！",
-    "roster_save_success": "✅ 排班時間表已成功儲存！",
-
-    # 模組 D: 查詢與管理
+    # ── 模組 D (查詢與同工管理) 標籤 ──
     "search_header": "🔍 紀錄查詢與系統管理",
-    "subtab_query": "🔍 綜合紀錄查詢",
-    "subtab_worker_mgmt": "👥 同工名單維護",
-    "search_query_label": "輸入關鍵字 (支援跨欄位、不限大小寫模糊查詢)",
-    "search_module_filter": "選擇查詢範圍",
-    "search_no_results": "ℹ️ 未找到符合條件的紀錄。",
-    "worker_add_header": "➕ 新增教會同工",
-    "worker_name_input": "同工姓名",
-    "worker_role_input": "主要服侍角色 / 恩賜",
-    "btn_add_worker": "➕ 新增同工",
-    "worker_add_success": "✅ 同工 [{name}] 已成功加入名單！",
-    "worker_list_header": "📋 目前在籍同工名單"
-}
+    "subtab_query": "🔍 紀錄查詢",
+    "subtab_worker_mgmt": "👥 同工名單管理",
 
-# ── 下拉選單與預設選項 (OPTIONS) ──
-OPTIONS = {
-    "venues": ["大堂", "201 副堂", "202 團契室", "301 主日學教室", "302 練琴室", "舞蹈教室", "教會廚房"],
-    "service_types": ["主日崇拜", "青年崇拜", "兒童主日學", "週三禱告會", "特會 / 講座", "團契聚會"],
-    "search_modules": ["全部模組", "恩典紀錄", "場地預約", "事奉排班"]
+    # 查詢子功能標籤
+    "select_module": "選擇查詢模組",
+    "search_keyword": "關鍵字搜尋 (支援姓名、內容、用途等)",
+    "date_range": "日期區間篩選",
+    "btn_search": "執行查詢",
+    "no_data_found": "查無符合條件的紀錄。",
+    "export_csv": "📥 下載查詢結果 (CSV)",
+
+    "tab_worker_mgmt": "👥 同工名單管理",
+    
+    # 同工管理標籤
+    "add_worker_header": "➕ 新增同工",
+    "worker_name_input": "同工姓名",
+    "worker_role_select": "主要事奉領域",
+    "btn_add_worker": "新增同工",
+    
+    "worker_mgmt_header": "👥 同工名單與狀態維護",
+    "btn_update_status": "更新狀態",
+    "btn_delete_worker": "刪除同工",
+    "msg_worker_updated": "已更新同工狀態！",
+    "msg_worker_deleted": "已成功刪除同工！",
+    "confirm_delete_worker": "確定要永久刪除此同工嗎？"
 }

@@ -78,6 +78,7 @@ LABELS = {
     "force_save_roster": "⚠️ 若有重複排班警示，仍強制儲存 (Force Save)",
     "btn_save_roster": "發布事奉時間表",
 
+    "tab_search": "🔍 查詢紀錄版面", 
     "tab_worker_mgmt": "👥 同工名單管理",
     "worker_mgmt_header": "👥 同工名單與狀態維護",
     "btn_update_status": "更新狀態",

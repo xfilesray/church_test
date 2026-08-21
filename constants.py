@@ -112,3 +112,13 @@ LABELS = {
     "msg_worker_deleted": "已成功刪除同工！",
     "confirm_delete_worker": "確定要永久刪除此同工嗎？"
 }
+
+# 模組查詢選項
+MODULE_OPTIONS = {
+    "grace": "📖 恩典與體會紀錄",
+    "venue": "🏠 場地借用紀錄",
+    "roster": "📅 事奉排班時間表"
+}
+
+# 同工狀態選項
+WORKER_STATUS_OPTIONS = ["在籍 (Active)", "休假 (On Leave)", "卸任 (Inactive)"]

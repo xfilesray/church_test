@@ -30,13 +30,13 @@ with col_time:
 st.divider()
 
 # ==========================================
-# 2. 四大模組分頁 (新增 Tab 4: 🔍 查詢紀錄)
+# 2. 四大模組分頁
 # ==========================================
 tab_grace, tab_venue, tab_roster, tab_viewer = st.tabs([
     c.LABELS["tab_grace"], 
     c.LABELS["tab_venue"], 
     c.LABELS["tab_roster"],
-    "🔍 查詢紀錄"  # 👈 新增查詢版面
+    "🔍 查詢紀錄"
 ])
 
 # ------------------------------------------
@@ -208,12 +208,11 @@ with tab_roster:
                     st.error(f"❌ 發布失敗：{e}")
 
 # ------------------------------------------
-# Module D: 🔍 查詢紀錄版面 (Data Viewer)
+# Module D: 🔍 查詢紀錄版面 (支援大小寫不限與多欄位搜尋)
 # ------------------------------------------
 with tab_viewer:
     st.header("🔍 教會事奉數據與紀錄查詢")
     
-    # 重新載入按鈕
     if st.button("🔄 重新整理資料"):
         st.rerun()
         
@@ -231,15 +230,17 @@ with tab_viewer:
             if grace_data:
                 df_grace = pd.DataFrame(grace_data)
                 
-                # 關鍵字搜尋
-                search_term = st.text_input("🔍 搜尋同工姓名或心得關鍵字：", key="search_grace")
-                if search_term:
+                # 關鍵字搜尋 (不限大小寫 case=False)
+                search_term = st.text_input("🔍 搜尋關鍵字（支援中英文、大細階）：", key="search_grace")
+                if search_term.strip():
+                    term = search_term.strip()
                     df_grace = df_grace[
-                        df_grace["worker_name"].str.contains(search_term, na=False) |
-                        df_grace["reflection"].str.contains(search_term, na=False)
+                        df_grace["worker_name"].astype(str).str.contains(term, case=False, na=False) |
+                        df_grace["spiritual_gifts"].astype(str).str.contains(term, case=False, na=False) |
+                        df_grace["reflection"].astype(str).str.contains(term, case=False, na=False) |
+                        df_grace["prayer_requests"].astype(str).str.contains(term, case=False, na=False)
                     ]
                 
-                # 重新整理顯示欄位名稱
                 df_grace_display = df_grace.rename(columns={
                     "event_date": "日期",
                     "time_slot": "時段",
@@ -264,12 +265,14 @@ with tab_viewer:
             if venue_data:
                 df_venue = pd.DataFrame(venue_data)
                 
-                # 關鍵字搜尋
-                search_venue = st.text_input("🔍 搜尋場地名稱或申請人：", key="search_venue")
-                if search_venue:
+                # 關鍵字搜尋 (不限大小寫 case=False)
+                search_venue = st.text_input("🔍 搜尋關鍵字（支援中英文、大細階）：", key="search_venue")
+                if search_venue.strip():
+                    term = search_venue.strip()
                     df_venue = df_venue[
-                        df_venue["venue_name"].str.contains(search_venue, na=False) |
-                        df_venue["applicant_name"].str.contains(search_venue, na=False)
+                        df_venue["venue_name"].astype(str).str.contains(term, case=False, na=False) |
+                        df_venue["applicant_name"].astype(str).str.contains(term, case=False, na=False) |
+                        df_venue["event_purpose"].astype(str).str.contains(term, case=False, na=False)
                     ]
                 
                 df_venue_display = df_venue.rename(columns={
@@ -296,11 +299,18 @@ with tab_viewer:
             if roster_data:
                 df_roster = pd.DataFrame(roster_data)
                 
-                # 關鍵字搜尋
-                search_roster = st.text_input("🔍 搜尋同工姓名或崗位：", key="search_roster")
-                if search_roster:
+                # 關鍵字搜尋 (不限大小寫 case=False，可搜尋英文名如 John 或 中文名)
+                search_roster = st.text_input("🔍 搜尋同工姓名或崗位（支援大細階）：", key="search_roster")
+                if search_roster.strip():
+                    term = search_roster.strip()
                     df_roster = df_roster[
-                        df_roster["all_workers"].astype(str).str.contains(search_roster, na=False)
+                        df_roster["all_workers"].astype(str).str.contains(term, case=False, na=False) |
+                        df_roster["worship_lead"].astype(str).str.contains(term, case=False, na=False) |
+                        df_roster["speaker"].astype(str).str.contains(term, case=False, na=False) |
+                        df_roster["av_team"].astype(str).str.contains(term, case=False, na=False) |
+                        df_roster["usher_team"].astype(str).str.contains(term, case=False, na=False) |
+                        df_roster["sunday_school"].astype(str).str.contains(term, case=False, na=False) |
+                        df_roster["other_roles"].astype(str).str.contains(term, case=False, na=False)
                     ]
                 
                 df_roster_display = df_roster.rename(columns={

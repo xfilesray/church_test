@@ -77,4 +77,12 @@ LABELS = {
     "roster_hint": "💡 多位同工請用逗號（中英文皆可）分隔，例如：張弟兄, 李姊妹",
     "force_save_roster": "⚠️ 若有重複排班警示，仍強制儲存 (Force Save)",
     "btn_save_roster": "發布事奉時間表"
+
+    "tab_worker_mgmt": "👥 同工名單管理",
+    "worker_mgmt_header": "👥 同工名單與狀態維護",
+    "btn_update_status": "更新狀態",
+    "btn_delete_worker": "刪除同工",
+    "msg_worker_updated": "已更新同工狀態！",
+    "msg_worker_deleted": "已成功刪除同工！",
+    "confirm_delete_worker": "確定要永久刪除此同工嗎？"
 }

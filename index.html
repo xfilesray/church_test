@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⛪ 教會事奉管理與恩典紀錄系統 - 全功能說明與系統代碼</title>
+    <!-- Font Awesome 圖標庫 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --accent: #e67e22;
+            --bg-light: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-main: #333333;
+            --text-muted: #666666;
+            --border-color: #e9ecef;
+            --code-bg: #1e1e1e;
+            --code-text: #d4d4d4;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+            line-height: 1.6;
+            color: var(--text-main);
+            background-color: var(--bg-light);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1080px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 40px 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        header p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 25px 30px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border-color);
+        }
+
+        .card h2 {
+            font-size: 1.4rem;
+            color: var(--primary);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .feature-box {
+            background: var(--bg-light);
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid var(--secondary);
+        }
+
+        .feature-box h3 {
+            font-size: 1.1rem;
+            color: var(--primary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feature-box ul {
+            list-style-position: inside;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .feature-box ul li {
+            margin-bottom: 6px;
+        }
+
+        .architecture-flow {
+            background: var(--code-bg);
+            color: #abb2bf;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: "Courier New", Courier, monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            line-height: 1.5;
+            margin-top: 15px;
+        }
+
+        .code-container {
+            background-color: var(--code-bg);
+            color: var(--code-text);
+            border-radius: 8px;
+            padding: 20px;
+            font-family: "Consolas", "Courier New", Courier, monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            overflow-x: auto;
+            margin-top: 15px;
+        }
+
+        .code-title {
+            font-weight: bold;
+            color: var(--secondary);
+            margin-bottom: 8px;
+            font-family: sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .keyword { color: #569cd6; }
+        .function { color: #dcdcaa; }
+        .string { color: #ce9178; }
+        .comment { color: #6a9955; font-style: italic; }
+
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            header { padding: 25px 15px; }
+            header h1 { font-size: 1.5rem; }
+            .card { padding: 18px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- Header Section -->
+    <header>
+        <h1><i class="fa-solid fa-church"></i> 教會事奉管理與恩典紀錄系統</h1>
+        <p>為同工與團隊打造的簡報/文件版專案介紹與完整核心代碼彙整</p>
+    </header>
+
+    <!-- Project Introduction -->
+    <section class="card">
+        <h2><i class="fa-solid fa-lightbulb"></i> 專案簡介與設計初衷</h2>
+        <p>本系統旨在協助教會更有效率地處理「事奉排班」、「場地/房間借用」以及「屬靈恩典紀錄」。</p>
+        <p>考慮到跨平台部署（如 Streamlit Cloud）時經常遇到的多國語系編碼與中文渲染 Bug，本系統採用嚴格的<b>前後端架構分離原則</b>設計：</p>
+        <div class="grid-3">
+            <div class="feature-box">
+                <h3><i class="fa-solid fa-code"></i> 前端與核心邏輯 (app.py)</h3>
+                <p>維持純英文變數與結構代碼，確保程式運行極致穩定、零編碼衝突。</p>
+            </div>
+            <div class="feature-box">
+                <h3><i class="fa-solid fa-language"></i> 語系與模組設定 (constants.py)</h3>
+                <p>將所有繁體中文 UI 標籤、選單選項與 Dataframe 欄位對照表集中管理，方便維護與擴充。</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Core Features -->
+    <section class="card">
+        <h2><i class="fa-solid fa-star"></i> 核心功能亮點</h2>
+        <div class="grid-3">
+            <div class="feature-box">
+                <h3><i class="fa-solid fa-pen-to-square"></i> 三合一多功能紀錄表單</h3>
+                <ul>
+                    <li><b>恩典與體會日記：</b>即時數算神的恩典、紀錄團隊服侍的心得與禱告事項。</li>
+                    <li><b>未來事奉人手排班：</b>涵蓋敬拜隊、主日學、音控/直播、接待等多項崗位。</li>
+                    <li><b>房間/場地借用：</b>管理大堂、副堂與各小組教室的借用時段與聯絡人。</li>
+                    <li><b>彈性自訂選項：</b>選擇「其他」時動態展開輸入框，方便填寫特殊事項。</li>
+                </ul>
+            </div>
+            <div class="feature-box">
+                <h3><i class="fa-solid fa-shield-halved"></i> 智慧防錯與防衝突機制</h3>
+                <ul>
+                    <li><b>同工重複排班預警：</b>自動解析多人名字（相容中英文逗點），重複時即時提醒。</li>
+                    <li><b>場地撞期警示：</b>同房間、同時間若已有預約，主動阻擋並發出衝突通知。</li>
+                    <li><b>強制儲存彈性：</b>提供 Force Save 按鈕因應特殊聯合聚會特例。</li>
+                </ul>
+            </div>
+            <div class="feature-box">
+                <h3><i class="fa-solid fa-database"></i> 前後端分離數據整合</h3>
+                <ul>
+                    <li><b>Supabase (PostgreSQL)：</b>作為雲端資料庫，確保資料安全與跨裝置同步。</li>
+                    <li><b>Pandas 資料整合：</b>前端整合 Pandas 提供快速關鍵字搜尋與美觀表格展示。</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- System Architecture -->
+    <section class="card">
+        <h2><i class="fa-solid fa-sitemap"></i> 技術架構一覽</h2>
+        <p>系統組件互動與職責劃分示意：</p>
+        <div class="architecture-flow">[使用者介面 Streamlit] ── (載入 UI 標籤) ──> [constants.py (繁中設定檔)]
+        │
+  (執行邏輯與防撞檢查)
+        │
+        ▼
+[雲端資料庫 Supabase] <── (CRUD 資料存取) ─── [app.py (純英文主程式)]</div>
+    </section>
+
+    <!-- Combined Functions Code Block -->
+    <section class="card">
+        <h2><i class="fa-solid fa-code"></i> 整合功能函式庫 (System Core Functions)</h2>
+        <p>以下將所有與資料庫存取、衝突檢測、資料解析及邏輯處理之 Function 完整匯整如下：</p>
+
+        <div class="code-container">
+            <div class="code-title"><i class="fa-brands fa-python"></i> database.py & helper_functions.py (組合整合檔)</div>
+            <pre><code><span class="keyword">import</span> re
+<span class="keyword">import</span> pandas <span class="keyword">as</span> pd
+<span class="keyword">from</span> supabase <span class="keyword">import</span> create_client, Client
+
+<span class="comment"># ==========================================</span>
+<span class="comment"># 1. 資料庫連線初始化 (Database Initialization)</span>
+<span class="comment"># ==========================================</span>
+<span class="keyword">def</span> <span class="function">init_supabase_client</span>(url: str, key: str) -> Client:
+    <span class="string">"""建立並傳回 Supabase Client 實例"""</span>
+    <span class="keyword">return</span> create_client(url, key)
+
+<span class="comment"># ==========================================</span>
+<span class="comment"># 2. 姓名解析與比對函式 (Name Parsing Helpers)</span>
+<span class="comment"># ==========================================</span>
+<span class="keyword">def</span> <span class="function">parse_personnel_names</span>(raw_text: str) -> list[str]:
+    <span class="string">"""相容中英文逗點、空格與換行，將輸入之同工名單拆解為乾淨 List"""</span>
+    <span class="keyword">if</span> <span class="keyword">not</span> raw_text:
+        <span class="keyword">return</span> []
+    names = re.split(r<span class="string">'[,，\s\n]+'</span>, raw_text.strip())
+    <span class="keyword">return</span> [name <span class="keyword">for</span> name <span class="keyword">in</span> names <span class="keyword">if</span> name]
+
+<span class="comment"># ==========================================</span>
+<span class="comment"># 3. 衝突檢測核心邏輯 (Conflict Detection)</span>
+<span class="comment"># ==========================================</span>
+<span class="keyword">def</span> <span class="function">check_schedule_conflicts</span>(supabase: Client, target_date: str, time_slot: str, 
+                             room_name: str, personnel_list: list[str]) -> dict:
+    <span class="string">"""
+    檢查場地撞期與人員重複排班衝突
+    Returns: {'has_room_conflict': bool, 'conflicting_people': list[str]}
+    """</span>
+    <span class="comment"># 抓取該日期與時段的現有資料</span>
+    response = supabase.table(<span class="string">"church_records"</span>)\
+        .select(<span class="string">"*"</span>)\
+        .eq(<span class="string">"event_date"</span>, target_date)\
+        .eq(<span class="string">"time_slot"</span>, time_slot)\
+        .execute()
+    
+    existing_records = response.data
+    room_conflict = <span class="keyword">False</span>
+    conflicting_people = []
+
+    <span class="keyword">for</span> rec <span class="keyword">in</span> existing_records:
+        <span class="comment"># 檢測場地衝突</span>
+        <span class="keyword">if</span> room_name <span class="keyword">and</span> rec.get(<span class="string">"room_name"</span>) == room_name:
+            room_conflict = <span class="keyword">True</span>
+        
+        <span class="comment"># 檢測人員重覆排班衝突</span>
+        existing_names = parse_personnel_names(rec.get(<span class="string">"personnel"</span>, <span class="string">""</span>))
+        <span class="keyword">for</span> p <span class="keyword">in</span> personnel_list:
+            <span class="keyword">if</span> p <span class="keyword">in</span> existing_names:
+                conflicting_people.append(p)
+
+    <span class="keyword">return</span> {
+        <span class="string">"has_room_conflict"</span>: room_conflict,
+        <span class="string">"conflicting_people"</span>: list(set(conflicting_people))
+    }
+
+<span class="comment"># ==========================================</span>
+<span class="comment"># 4. 資料庫 CRUD 操作函式 (CRUD Operations)</span>
+<span class="comment"># ==========================================</span>
+<span class="keyword">def</span> <span class="function">insert_church_record</span>(supabase: Client, data: dict) -> dict:
+    <span class="string">"""將新筆記錄寫入 Supabase 資料庫"""</span>
+    response = supabase.table(<span class="string">"church_records"</span>).insert(data).execute()
+    <span class="keyword">return</span> response.data
+
+<span class="keyword">def</span> <span class="function">fetch_all_records</span>(supabase: Client) -> pd.DataFrame:
+    <span class="string">"""從資料庫讀取所有紀錄並轉為 Pandas DataFrame"""</span>
+    response = supabase.table(<span class="string">"church_records"</span>).select(<span class="string">"*"</span>).order(<span class="string">"created_at"</span>, desc=<span class="keyword">True</span>).execute()
+    <span class="keyword">if</span> response.data:
+        <span class="keyword">return</span> pd.DataFrame(response.data)
+    <span class="keyword">return</span> pd.DataFrame()
+
+<span class="keyword">def</span> <span class="function">search_records</span>(df: pd.DataFrame, keyword: str) -> pd.DataFrame:
+    <span class="string">"""進行動態關鍵字搜尋對應項目"""</span>
+    <span class="keyword">if</span> df.empty <span class="keyword">or</span> <span class="keyword">not</span> keyword:
+        <span class="keyword">return</span> df
+    
+    mask = df.apply(<span class="keyword">lambda</span> row: row.astype(str).str.contains(keyword, case=<span class="keyword">False</span>).any(), axis=1)
+    <span class="keyword">return</span> df[mask]
+</code></pre>
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

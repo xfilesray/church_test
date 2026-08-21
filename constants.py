@@ -1,11 +1,15 @@
-# 頁面與標題設定
+# ==========================================
+# constants.py - 教會事奉管理系統 繁體中文設定檔
+# ==========================================
+
+# 1. 頁面標題與系統名稱
 PAGE_TITLE = "教會事奉管理與恩典紀錄系統"
 MAIN_TITLE = "⛪ 教會事奉管理與恩典紀錄系統"
 
-# 分頁名稱
+# 2. 分頁名稱 (Tabs)
 TABS = ["📅 未來事奉排班", "🏠 場地借用管理", "🌟 恩典體會日記"]
 
-# 紀錄類型選單對照
+# 3. 紀錄類型對照表 (Record Types)
 RECORD_TYPE_KEYS = ["SCHEDULE", "ROOMS", "DIARY"]
 RECORD_TYPE_MAP = {
     "SCHEDULE": "📅 事奉排班",
@@ -13,44 +17,78 @@ RECORD_TYPE_MAP = {
     "DIARY": "🌟 恩典日記",
 }
 
-# 選單觸發詞
+# 4. 下拉式選單觸發詞 (用於啟動動態文字輸入框)
 OTHER_CUSTOM_TRIGGER = "其他 / 請自行於下方輸入"
 
-# 小組列表
-GROUPS = ["主日學", "青年社青", "婦女會", "弟兄會", "敬拜讚美隊", "其他 / 請自行於下方輸入"]
+# 5. 下拉選單預設基礎選項 (Base Options)
+# 當同工輸入並儲存新的小組、崗位或場地後，系統會自動向 Supabase 撈取歷史紀錄並擴充至此選單中
+GROUPS = [
+    "青年小組",
+    "社青小組",
+    "婦女小組",
+    "弟兄小組",
+    "長者小組",
+    "主日學部",
+    "敬拜事奉處",
+    "行政幹事部",
+    OTHER_CUSTOM_TRIGGER,
+]
 
-# 事奉崗位列表
-ROLES = ["領唱/主領", "司琴/伴奏", "音控/直播", "司會", "接待/招聚", "其他 / 請自行於下方輸入"]
+ROLES = [
+    "主領 / 司會",
+    "領唱 / 歌手",
+    "司琴 / 伴奏",
+    "吉他手 / 樂手",
+    "鼓手",
+    "音控 / 直播",
+    "簡播 / 投影",
+    "接待 / 招待",
+    "主日學老師",
+    "講員 / 證道",
+    OTHER_CUSTOM_TRIGGER,
+]
 
-# 場地/房間列表
-ROOMS = ["大堂", "副堂", "副堂A教室", "副堂B教室", "會客室", "其他 / 請自行於下方輸入"]
+ROOMS = [
+    "大堂 (Main Hall)",
+    "副堂 (Sub Hall)",
+    "101 教室",
+    "102 教室",
+    "201 小組室",
+    "副堂會客室",
+    "舞蹈/舞蹈團契室",
+    OTHER_CUSTOM_TRIGGER,
+]
 
-# Dataframe 表格欄位名稱映射
+# 6. Dataframe 顯示欄位映射 (英中對照)
+
+# 分頁 1: 未來事奉排班欄位映射
 DF_COL_MAP_SCHEDULE = {
     "service_date": "日期",
     "service_time": "時間",
     "role": "事奉崗位",
-    "content": "事奉內容",
-    "group_name": "所屬小組",
-    "people": "同工姓名",
+    "group_name": "小組",
+    "people": "事奉同工",
+    "content": "聚會摘要",
     "grace_notes": "備註",
 }
 
+# 分頁 2: 場地借用管理欄位映射
 DF_COL_MAP_ROOMS = {
-    "service_date": "借用日期",
-    "service_time": "借用時間",
-    "room_name": "場地/房間",
-    "content": "使用用途",
+    "service_date": "日期",
+    "service_time": "時間",
+    "room_name": "借用場地",
     "group_name": "借用單位/小組",
-    "people": "聯絡負責人",
-    "grace_notes": "器材/特別需求",
+    "people": "負責人",
+    "content": "使用用途",
+    "grace_notes": "器材需求/備註",
 }
 
+# 分頁 3: 恩典體會日記欄位映射
 DF_COL_MAP_DIARY = {
     "service_date": "日期",
     "service_time": "時間",
     "role": "崗位",
-    "group_name": "所屬小組",
+    "group_name": "小組",
     "people": "同行同工",
     "content": "摘要",
     "grace_notes": "恩典體會",

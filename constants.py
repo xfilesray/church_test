@@ -80,17 +80,30 @@ MSG_NO_DATA = "目前尚無任何紀錄。"
 # Conflict Warning Messages
 WARN_WORKER_CONFLICT = "⚠️ 同工排班衝突警示："
 WARN_VENUE_CONFLICT = "⚠️ 場地撞期警示："
+# constants.py (新增/更新時間相關標籤)
+# ...[保留原本的設定]...
 
-# Database Field Mappings (Supabase English Keys -> Traditional Chinese Display)
+# Form Field Labels - 新增時間選取標籤
+LABEL_DATE = "日期"
+LABEL_TIME_OPTION = "時間設定方式"
+LABEL_START_TIME = "開始時間"
+LABEL_END_TIME = "結束時間"
+
+TIME_OPTION_SLOT = "選擇預設時段"
+TIME_OPTION_CUSTOM = "自訂具體時間 (幾點幾分)"
+
+# Database Field Mappings (更新欄位映射，加入時間欄位)
 COLUMN_MAP = {
     "created_at": "建立時間",
     "event_date": "日期",
+    "start_time": "開始時間",
+    "end_time": "結束時間",
     "submitted_by": "紀錄人",
     "record_type": "紀錄類型",
     "content": "詳情/心得",
     "service_role": "事奉崗位",
     "service_workers": "服侍同工",
     "venue_name": "借用場地",
-    "time_slot": "時段",
+    "time_slot": "時段/時間",
     "contact_person": "場地負責人"
 }

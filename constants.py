@@ -40,6 +40,12 @@ VENUE_OPTIONS = [
 
 # UI 文字標籤 (UI Labels)
 LABELS = {
+    # ── 主選單 Tab 標籤 ──
+    "tab_grace": "📖 恩典與體會紀錄",
+    "tab_venue": "🏠 場地借用",
+    "tab_roster": "📅 事奉排班時間表",
+    "tab_search": "🔍 查詢紀錄與管理",
+    
     "date_section": "📅 請選擇活動 / 事奉時間 (Shared Date & Time)",
     "select_date": "選擇日期",
     "select_time": "選擇時段",

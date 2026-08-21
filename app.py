@@ -103,7 +103,7 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    st.caption("⛪ 教會事奉管理系統 v2.2")
+    st.caption("⛪ 教會事奉管理系統 v2.3")
 
 # ------------------------------------------
 # 4. View 1: Form Input
@@ -112,7 +112,7 @@ if menu_choice == c.NAV_LABEL_FORM:
     st.title(f"{c.PAGE_ICON} {c.PAGE_TITLE}")
     st.subheader(c.FORM_TITLE)
 
-    # 第一階段：基本資訊（放在 Form 外部以實現無縫動態渲染）
+    # 基本資訊
     st.markdown(f"### {c.SECTION_BASIC}")
     col1, col2 = st.columns(2)
     with col1:
@@ -125,7 +125,7 @@ if menu_choice == c.NAV_LABEL_FORM:
     st.markdown("---")
     st.markdown(f"### {c.SECTION_CATEGORY}")
 
-    # 第二階段：動態欄位選擇（即時彈出自訂輸入框）
+    # 動態欄位選擇
     service_role = ""
     service_workers = ""
     venue_name = ""
@@ -134,27 +134,25 @@ if menu_choice == c.NAV_LABEL_FORM:
     end_time_str = ""
     contact_person = ""
 
-    # A. 事奉排班動態選擇
+    # A. 事奉排班
     if record_type == c.TYPE_SERVICE:
         st.info("💡 您正在填寫【事奉排班】紀錄")
         selected_role = st.selectbox(c.LABEL_SERVICE_ROLE, c.SERVICE_ROSTER_OPTIONS, key="select_service_role")
         
-        # 關鍵點：選取「其他」時自動彈出輸入框
-        if selected_role == c.CUSTOM_OPTION_KEYWORD:
-            service_role = st.text_input(c.LABEL_CUSTOM_ROLE, key="custom_role_input")
+        if selected_role == c.OPTION_CUSTOM_ROLE:
+            service_role = st.text_input(c.LABEL_CUSTOM_ROLE_INPUT, key="custom_role_input")
         else:
             service_role = selected_role
             
         service_workers = st.text_input(c.LABEL_SERVICE_WORKERS, help=c.HELP_SERVICE_WORKERS, key="input_service_workers")
 
-    # B. 場地借用動態選擇
+    # B. 場地借用
     elif record_type == c.TYPE_VENUE:
         st.info("💡 您正在填寫【場地/房間借用】申請")
         selected_venue = st.selectbox(c.LABEL_VENUE_NAME, c.VENUE_OPTIONS, key="select_venue_name")
         
-        # 關鍵點：選取「其他」時自動彈出輸入框
-        if selected_venue == c.CUSTOM_OPTION_KEYWORD:
-            venue_name = st.text_input(c.LABEL_CUSTOM_VENUE, key="custom_venue_input")
+        if selected_venue == c.OPTION_CUSTOM_VENUE:
+            venue_name = st.text_input(c.LABEL_CUSTOM_VENUE_INPUT, key="custom_venue_input")
         else:
             venue_name = selected_venue
 

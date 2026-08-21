@@ -103,7 +103,7 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    st.caption("⛪ 教會事奉管理系統 v2.3")
+    st.caption("⛪ 教會事奉管理系統 v2.4")
 
 # ------------------------------------------
 # 4. View 1: Form Input
@@ -125,7 +125,7 @@ if menu_choice == c.NAV_LABEL_FORM:
     st.markdown("---")
     st.markdown(f"### {c.SECTION_CATEGORY}")
 
-    # 動態欄位選擇
+    # 動態欄位初始化
     service_role = ""
     service_workers = ""
     venue_name = ""
@@ -134,19 +134,29 @@ if menu_choice == c.NAV_LABEL_FORM:
     end_time_str = ""
     contact_person = ""
 
-    # A. 事奉排班
-    if record_type == c.TYPE_SERVICE:
+    # A. 恩典與體會日記（已整合事奉崗位選單）
+    if record_type == c.TYPE_GRACE:
+        st.info("💡 您正在填寫【恩典與體會日記】")
+        selected_role = st.selectbox(c.LABEL_GRACE_ROLE, c.SERVICE_ROSTER_OPTIONS, key="select_grace_role")
+        
+        if selected_role == c.OPTION_CUSTOM_ROLE:
+            service_role = st.text_input(c.LABEL_CUSTOM_ROLE_INPUT, key="custom_grace_role_input")
+        else:
+            service_role = selected_role
+
+    # B. 未來事奉人手排班
+    elif record_type == c.TYPE_SERVICE:
         st.info("💡 您正在填寫【事奉排班】紀錄")
         selected_role = st.selectbox(c.LABEL_SERVICE_ROLE, c.SERVICE_ROSTER_OPTIONS, key="select_service_role")
         
         if selected_role == c.OPTION_CUSTOM_ROLE:
-            service_role = st.text_input(c.LABEL_CUSTOM_ROLE_INPUT, key="custom_role_input")
+            service_role = st.text_input(c.LABEL_CUSTOM_ROLE_INPUT, key="custom_service_role_input")
         else:
             service_role = selected_role
             
         service_workers = st.text_input(c.LABEL_SERVICE_WORKERS, help=c.HELP_SERVICE_WORKERS, key="input_service_workers")
 
-    # B. 場地借用
+    # C. 場地/房間借用
     elif record_type == c.TYPE_VENUE:
         st.info("💡 您正在填寫【場地/房間借用】申請")
         selected_venue = st.selectbox(c.LABEL_VENUE_NAME, c.VENUE_OPTIONS, key="select_venue_name")
@@ -177,10 +187,6 @@ if menu_choice == c.NAV_LABEL_FORM:
             time_slot = f"{start_time_str} - {end_time_str}"
 
         contact_person = st.text_input(c.LABEL_CONTACT_PERSON, key="input_contact_person")
-
-    # C. 恩典日記
-    elif record_type == c.TYPE_GRACE:
-        st.info("💡 您正在填寫【恩典與體會日記】")
 
     # 通用內容與提交表單
     with st.form(key="church_record_submit_form", clear_on_submit=False):
@@ -262,7 +268,7 @@ elif menu_choice == c.NAV_LABEL_DATA:
             with col_filter1:
                 filter_type = st.multiselect("篩選紀錄類型", c.RECORD_TYPES, default=c.RECORD_TYPES)
             with col_filter2:
-                search_query = st.text_input("🔍 全文關鍵字搜尋 (日期/同工/場地/內容)", "")
+                search_query = st.text_input("🔍 全文關鍵字搜尋 (日期/同工/場地/崗位/內容)", "")
 
             if filter_type:
                 df = df[df["record_type"].isin(filter_type)]

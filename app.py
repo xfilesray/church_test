@@ -108,7 +108,7 @@ with tab_venue:
         
         submit_venue = st.form_submit_button(c.LABELS["btn_save_venue"])
         
-         if submit_venue:
+        if submit_venue:
             if not final_venue.strip() or not applicant_name.strip():
                 st.error("❌ 請填寫完整的場地名稱與申請人資訊！")
             else:

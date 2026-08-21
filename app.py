@@ -1,3 +1,15 @@
+# ==========================================
+# File: app.py (Top Level Imports)
+# Description: Dynamically append root directory to sys.path
+# ==========================================
+import os
+import sys
+
+# 強制將當前 app.py 所在目錄加入 Python 搜尋路徑
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+if ROOT_DIR not in sys.path:
+    sys.path.append(ROOT_DIR)
+
 import streamlit as st
 import pandas as pd
 import constants as c

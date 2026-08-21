@@ -1,95 +1,96 @@
+# constants.py
 # ==========================================
-# constants.py - 教會事奉管理系統 繁體中文設定檔
+# Church Service Management & Grace Journal
+# Language & Configuration Management
 # ==========================================
 
-# 1. 頁面標題與系統名稱
+# Page Config
 PAGE_TITLE = "教會事奉管理與恩典紀錄系統"
-MAIN_TITLE = "⛪ 教會事奉管理與恩典紀錄系統"
+PAGE_ICON = "⛪"
 
-# 2. 分頁名稱 (Tabs)
-TABS = ["📅 未來事奉排班", "🏠 場地借用管理", "🌟 恩典體會日記"]
+# Sidebar / Navigation Labels
+NAV_HEADER = "⛪ 系統選單"
+NAV_LABEL_FORM = "📝 新增資料表單"
+NAV_LABEL_DATA = "📊 資料查詢與管理"
 
-# 3. 紀錄類型對照表 (Record Types)
-RECORD_TYPE_KEYS = ["SCHEDULE", "ROOMS", "DIARY"]
-RECORD_TYPE_MAP = {
-    "SCHEDULE": "📅 事奉排班",
-    "ROOMS": "🏠 場地借用",
-    "DIARY": "🌟 恩典日記",
-}
+# Form Sections
+FORM_TITLE = "📝 提交新紀錄"
+SECTION_BASIC = "1. 基本資訊"
+SECTION_CATEGORY = "2. 紀錄類型與對應內容"
 
-# 4. 下拉式選單觸發詞 (用於啟動動態文字輸入框)
-OTHER_CUSTOM_TRIGGER = "其他 / 請自行於下方輸入"
+# Form Field Labels
+LABEL_DATE = "日期"
+LABEL_USER = "紀錄人 / 提交者"
+LABEL_RECORD_TYPE = "選擇紀錄類型"
+LABEL_CONTENT = "內容詳情 / 禱告事項"
 
-# 5. 下拉選單預設基礎選項 (Base Options)
-# 當同工輸入並儲存新的小組、崗位或場地後，系統會自動向 Supabase 撈取歷史紀錄並擴充至此選單中
-GROUPS = [
-    "青年小組",
-    "社青小組",
-    "婦女小組",
-    "弟兄小組",
-    "長者小組",
-    "主日學部",
-    "敬拜事奉處",
-    "行政幹事部",
-    OTHER_CUSTOM_TRIGGER,
-]
+# Record Type Options
+TYPE_GRACE = "📖 恩典與體會日記"
+TYPE_SERVICE = "📅 未來事奉人手排班"
+TYPE_VENUE = "🏠 教會房間/場地借用"
 
-ROLES = [
-    "主領 / 司會",
-    "領唱 / 歌手",
-    "司琴 / 伴奏",
-    "吉他手 / 樂手",
-    "鼓手",
-    "音控 / 直播",
-    "簡播 / 投影",
-    "接待 / 招待",
+RECORD_TYPES = [TYPE_GRACE, TYPE_SERVICE, TYPE_VENUE]
+
+# Dynamic Options - Service Roster
+LABEL_SERVICE_ROLE = "事奉崗位"
+SERVICE_ROSTER_OPTIONS = [
+    "敬拜讚美隊",
     "主日學老師",
-    "講員 / 證道",
-    OTHER_CUSTOM_TRIGGER,
+    "音控與直播組",
+    "招待與款待組",
+    "聖餐服侍組",
+    "其他 / 請自行於下方輸入"
 ]
+LABEL_CUSTOM_ROLE = "請輸入自訂事奉崗位"
+LABEL_SERVICE_WORKERS = "服侍同工名單（多人請用逗點分隔）"
+HELP_SERVICE_WORKERS = "例如：張小明, 李大華, John Doe"
 
-ROOMS = [
-    "大堂 (Main Hall)",
-    "副堂 (Sub Hall)",
-    "101 教室",
-    "102 教室",
-    "201 小組室",
-    "副堂會客室",
-    "舞蹈/舞蹈團契室",
-    OTHER_CUSTOM_TRIGGER,
+# Dynamic Options - Venue Booking
+LABEL_VENUE_NAME = "借用場地/房間"
+VENUE_OPTIONS = [
+    "大堂 (Main Sanctuary)",
+    "副堂 (Fellowship Hall)",
+    "小組教室 A (Room A)",
+    "小組教室 B (Room B)",
+    "舞蹈/練琴房 (Music Room)",
+    "其他 / 請自行於下方輸入"
 ]
+LABEL_CUSTOM_VENUE = "請輸入自訂場地名稱"
+LABEL_TIME_SLOT = "借用時段"
+TIME_SLOT_OPTIONS = [
+    "早禱會 (07:30 - 08:30)",
+    "主日早場 (09:00 - 11:00)",
+    "主日午場 (11:30 - 13:30)",
+    "午後團契 (14:00 - 16:30)",
+    "晚間聚會 (19:30 - 21:30)",
+    "全天借用"
+]
+LABEL_CONTACT_PERSON = "場地負責人 / 聯絡同工"
 
-# 6. Dataframe 顯示欄位映射 (英中對照)
+# Buttons & Messages
+BTN_SUBMIT = "提交紀錄"
+BTN_FORCE_SAVE = "⚠️ 強制儲存（忽略衝突）"
 
-# 分頁 1: 未來事奉排班欄位映射
-DF_COL_MAP_SCHEDULE = {
-    "service_date": "日期",
-    "service_time": "時間",
-    "role": "事奉崗位",
-    "group_name": "小組",
-    "people": "事奉同工",
-    "content": "聚會摘要",
-    "grace_notes": "備註",
-}
+MSG_SUCCESS = "✅ 紀錄成功寫入資料庫！"
+MSG_FORCE_SUCCESS = "⚠️ 已成功強制寫入資料庫！"
+MSG_MISSING_FIELDS = "❌ 請填寫所有必填欄位。"
+MSG_DB_ERROR = "❌ 資料庫操作失敗："
+MSG_NO_DATA = "目前尚無任何紀錄。"
 
-# 分頁 2: 場地借用管理欄位映射
-DF_COL_MAP_ROOMS = {
-    "service_date": "日期",
-    "service_time": "時間",
-    "room_name": "借用場地",
-    "group_name": "借用單位/小組",
-    "people": "負責人",
-    "content": "使用用途",
-    "grace_notes": "器材需求/備註",
-}
+# Conflict Warning Messages
+WARN_WORKER_CONFLICT = "⚠️ 同工排班衝突警示："
+WARN_VENUE_CONFLICT = "⚠️ 場地撞期警示："
 
-# 分頁 3: 恩典體會日記欄位映射
-DF_COL_MAP_DIARY = {
-    "service_date": "日期",
-    "service_time": "時間",
-    "role": "崗位",
-    "group_name": "小組",
-    "people": "同行同工",
-    "content": "摘要",
-    "grace_notes": "恩典體會",
+# Database Field Mappings (Supabase English Keys -> Traditional Chinese Display)
+COLUMN_MAP = {
+    "created_at": "建立時間",
+    "event_date": "日期",
+    "submitted_by": "紀錄人",
+    "record_type": "紀錄類型",
+    "content": "詳情/心得",
+    "service_role": "事奉崗位",
+    "service_workers": "服侍同工",
+    "venue_name": "借用場地",
+    "time_slot": "時段",
+    "contact_person": "場地負責人"
 }

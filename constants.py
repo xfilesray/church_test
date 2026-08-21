@@ -76,7 +76,7 @@ LABELS = {
     "other_roles": "其他事奉同工",
     "roster_hint": "💡 多位同工請用逗號（中英文皆可）分隔，例如：張弟兄, 李姊妹",
     "force_save_roster": "⚠️ 若有重複排班警示，仍強制儲存 (Force Save)",
-    "btn_save_roster": "發布事奉時間表"
+    "btn_save_roster": "發布事奉時間表",
 
     "tab_worker_mgmt": "👥 同工名單管理",
     "worker_mgmt_header": "👥 同工名單與狀態維護",

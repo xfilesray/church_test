@@ -1,37 +1,37 @@
 # constants.py
 # ==========================================
-# Church Service Management & Grace Journal
-# Language & Configuration Management
+# 教會事奉管理與恩典紀錄系統 - 設定檔
 # ==========================================
 
-# Page Config
 PAGE_TITLE = "教會事奉管理與恩典紀錄系統"
 PAGE_ICON = "⛪"
 
-# Sidebar / Navigation Labels
+# 導覽列
 NAV_HEADER = "⛪ 系統選單"
 NAV_LABEL_FORM = "📝 新增資料表單"
 NAV_LABEL_DATA = "📊 資料查詢與管理"
 
-# Form Sections
+# 表單標題與區塊
 FORM_TITLE = "📝 提交新紀錄"
 SECTION_BASIC = "1. 基本資訊"
 SECTION_CATEGORY = "2. 紀錄類型與對應內容"
 
-# Form Field Labels
+# 共通欄位標籤
 LABEL_DATE = "日期"
 LABEL_USER = "紀錄人 / 提交者"
 LABEL_RECORD_TYPE = "選擇紀錄類型"
 LABEL_CONTENT = "內容詳情 / 禱告事項"
 
-# Record Type Options
+# 紀錄類型選項（請勿修改圖示與字串，主程式以此進行比對）
 TYPE_GRACE = "📖 恩典與體會日記"
 TYPE_SERVICE = "📅 未來事奉人手排班"
 TYPE_VENUE = "🏠 教會房間/場地借用"
 
 RECORD_TYPES = [TYPE_GRACE, TYPE_SERVICE, TYPE_VENUE]
 
-# Dynamic Options - Service Roster
+# ------------------------------------------
+# 事奉排班欄位與選項
+# ------------------------------------------
 LABEL_SERVICE_ROLE = "事奉崗位"
 SERVICE_ROSTER_OPTIONS = [
     "敬拜讚美隊",
@@ -45,7 +45,9 @@ LABEL_CUSTOM_ROLE = "請輸入自訂事奉崗位"
 LABEL_SERVICE_WORKERS = "服侍同工名單（多人請用逗點分隔）"
 HELP_SERVICE_WORKERS = "例如：張小明, 李大華, John Doe"
 
-# Dynamic Options - Venue Booking
+# ------------------------------------------
+# 場地借用欄位與時間選取標籤
+# ------------------------------------------
 LABEL_VENUE_NAME = "借用場地/房間"
 VENUE_OPTIONS = [
     "大堂 (Main Sanctuary)",
@@ -56,7 +58,12 @@ VENUE_OPTIONS = [
     "其他 / 請自行於下方輸入"
 ]
 LABEL_CUSTOM_VENUE = "請輸入自訂場地名稱"
-LABEL_TIME_SLOT = "借用時段"
+
+LABEL_TIME_OPTION = "時間設定方式"
+TIME_OPTION_SLOT = "選擇預設時段"
+TIME_OPTION_CUSTOM = "自訂具體時間 (幾點幾分)"
+
+LABEL_TIME_SLOT = "預設時段"
 TIME_SLOT_OPTIONS = [
     "早禱會 (07:30 - 08:30)",
     "主日早場 (09:00 - 11:00)",
@@ -65,9 +72,11 @@ TIME_SLOT_OPTIONS = [
     "晚間聚會 (19:30 - 21:30)",
     "全天借用"
 ]
+LABEL_START_TIME = "開始時間"
+LABEL_END_TIME = "結束時間"
 LABEL_CONTACT_PERSON = "場地負責人 / 聯絡同工"
 
-# Buttons & Messages
+# 按鈕與提示訊息
 BTN_SUBMIT = "提交紀錄"
 BTN_FORCE_SAVE = "⚠️ 強制儲存（忽略衝突）"
 
@@ -77,22 +86,10 @@ MSG_MISSING_FIELDS = "❌ 請填寫所有必填欄位。"
 MSG_DB_ERROR = "❌ 資料庫操作失敗："
 MSG_NO_DATA = "目前尚無任何紀錄。"
 
-# Conflict Warning Messages
 WARN_WORKER_CONFLICT = "⚠️ 同工排班衝突警示："
 WARN_VENUE_CONFLICT = "⚠️ 場地撞期警示："
-# constants.py (新增/更新時間相關標籤)
-# ...[保留原本的設定]...
 
-# Form Field Labels - 新增時間選取標籤
-LABEL_DATE = "日期"
-LABEL_TIME_OPTION = "時間設定方式"
-LABEL_START_TIME = "開始時間"
-LABEL_END_TIME = "結束時間"
-
-TIME_OPTION_SLOT = "選擇預設時段"
-TIME_OPTION_CUSTOM = "自訂具體時間 (幾點幾分)"
-
-# Database Field Mappings (更新欄位映射，加入時間欄位)
+# Supabase 英文欄位對照至繁體中文顯示
 COLUMN_MAP = {
     "created_at": "建立時間",
     "event_date": "日期",

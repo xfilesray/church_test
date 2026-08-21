@@ -1,7 +1,17 @@
 import streamlit as st
 import pandas as pd
 import constants as c
+import database as db
 
+# 範例 B：場地借用提交
+if submit_venue:
+    has_conflict = db.check_venue_conflict(selected_date, selected_time_slot, final_venue)
+    if has_conflict and not force_save_venue:
+        st.error(f"⚠️ 衝突警示：[{final_venue}] 在此時段已被預約！若需覆蓋請勾選強制儲存。")
+    else:
+        db.save_venue_booking(selected_date, selected_time_slot, final_venue, applicant_name, event_purpose, force_save_venue)
+        st.success(f"✅ 已成功提交 [{final_venue}] 的借用申請！")
+        
 # 設定頁面資訊
 st.set_page_config(page_title="Church Ministry Management System", layout="wide")
 

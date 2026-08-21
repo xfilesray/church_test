@@ -142,3 +142,30 @@ def add_church_worker(worker_name):
     data = {"name": worker_name.strip()}
     res = supabase.table("church_workers").upsert(data, on_conflict="name").execute()
     return res
+    
+# ==========================================
+# 同工名單管理進階函數 (Worker Management)
+# ==========================================
+def fetch_all_church_workers():
+    """讀取所有同工（包含已停用者），供管理者維護"""
+    res = supabase.table("church_workers") \
+        .select("*") \
+        .order("id", desc=False) \
+        .execute()
+    return res.data if res.data else []
+
+def update_worker_status(worker_id: int, is_active: bool):
+    """更新同工啟用/停用狀態"""
+    res = supabase.table("church_workers") \
+        .update({"is_active": is_active}) \
+        .eq("id", worker_id) \
+        .execute()
+    return res
+
+def delete_worker(worker_id: int):
+    """自資料庫永久刪除同工"""
+    res = supabase.table("church_workers") \
+        .delete() \
+        .eq("id", worker_id) \
+        .execute()
+    return res

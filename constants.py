@@ -84,8 +84,27 @@ LABELS = {
     "force_save_roster": "⚠️ 若有重複排班警示，仍強制儲存 (Force Save)",
     "btn_save_roster": "發布事奉時間表",
 
-    "tab_search": "🔍 查詢紀錄版面", 
+    # ── 模組 D (查詢與同工管理) 標籤 ──
+    "search_header": "🔍 紀錄查詢與系統管理",
+    "subtab_query": "🔍 紀錄查詢",
+    "subtab_worker_mgmt": "👥 同工名單管理",
+
+    # 查詢子功能標籤
+    "select_module": "選擇查詢模組",
+    "search_keyword": "關鍵字搜尋 (支援姓名、內容、用途等)",
+    "date_range": "日期區間篩選",
+    "btn_search": "執行查詢",
+    "no_data_found": "查無符合條件的紀錄。",
+    "export_csv": "📥 下載查詢結果 (CSV)",
+
     "tab_worker_mgmt": "👥 同工名單管理",
+    
+    # 同工管理標籤
+    "add_worker_header": "➕ 新增同工",
+    "worker_name_input": "同工姓名",
+    "worker_role_select": "主要事奉領域",
+    "btn_add_worker": "新增同工",
+    
     "worker_mgmt_header": "👥 同工名單與狀態維護",
     "btn_update_status": "更新狀態",
     "btn_delete_worker": "刪除同工",

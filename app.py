@@ -45,10 +45,10 @@ st.divider()
 # 2. 四大模組分頁
 # ==========================================
 tab_grace, tab_venue, tab_roster, tab_viewer = st.tabs([
-    c.LABELS["tab_grace"], 
-    c.LABELS["tab_venue"], 
+    c.LABELS["tab_grace"],
+    c.LABELS["tab_venue"],
     c.LABELS["tab_roster"],
-    "🔍 查詢紀錄"
+    c.LABELS["tab_search"]
 ])
 
 # ------------------------------------------

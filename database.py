@@ -122,3 +122,23 @@ def fetch_ministry_rosters():
     """讀取所有事奉排班紀錄"""
     res = supabase.table("ministry_rosters").select("*").order("event_date", desc=True).execute()
     return res.data
+    
+# ==========================================
+# 同工名單管理 (Church Workers Management)
+# ==========================================
+def fetch_church_workers():
+    """動態讀取所有啟用的同工名單"""
+    res = supabase.table("church_workers") \
+        .select("name") \
+        .eq("is_active", True) \
+        .order("name") \
+        .execute()
+    return [row["name"] for row in res.data] if res.data else []
+
+def add_church_worker(worker_name):
+    """新增新同工至資料庫（若已存在則忽略）"""
+    if not worker_name or not worker_name.strip():
+        return None
+    data = {"name": worker_name.strip()}
+    res = supabase.table("church_workers").upsert(data, on_conflict="name").execute()
+    return res

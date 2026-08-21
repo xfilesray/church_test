@@ -162,3 +162,48 @@ def delete_worker(worker_id: int) -> bool:
     """刪除指定同工"""
     res = supabase.table("workers").delete().eq("id", worker_id).execute()
     return len(res.data) > 0
+
+# ==========================================
+# File: database.py
+# Section: Dynamic Church Workers Management
+# ==========================================
+
+def fetch_church_workers() -> list:
+    """
+    動態讀取所有在籍（啟用中）的同工名單，供 Module C 排班下拉選單使用
+    """
+    try:
+        # 查詢 workers 表格中 status 為在籍的同工
+        res = supabase.table("workers") \
+            .select("name") \
+            .eq("status", "在籍 (Active)") \
+            .order("name") \
+            .execute()
+        
+        if res.data:
+            return [row["name"] for row in res.data if "name" in row]
+        return []
+    except Exception as e:
+        print(f"Error fetching church workers: {e}")
+        return []
+
+def add_church_worker(worker_name: str, primary_role: str = "一般同工") -> bool:
+    """
+    新增同工至資料庫（若已存在則不重複寫入）
+    """
+    if not worker_name or not worker_name.strip():
+        return False
+    
+    clean_name = worker_name.strip()
+    try:
+        payload = {
+            "name": clean_name,
+            "primary_role": primary_role,
+            "status": "在籍 (Active)"
+        }
+        # 使用 upsert 根據 name (UNIQUE 鍵) 避免主鍵衝突
+        res = supabase.table("workers").upsert(payload, on_conflict="name").execute()
+        return len(res.data) > 0
+    except Exception as e:
+        print(f"Error adding church worker: {e}")
+        return False

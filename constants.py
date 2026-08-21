@@ -33,31 +33,31 @@ RECORD_TYPES = [TYPE_GRACE, TYPE_SERVICE, TYPE_VENUE]
 
 # Dynamic Options - Service Roster
 LABEL_SERVICE_ROLE = "事奉崗位"
-CUSTOM_OPTION_KEYWORD = "其他 / 請自行於下方輸入"
-
+OPTION_CUSTOM_ROLE = "其他 / 請自行於下方輸入"
 SERVICE_ROSTER_OPTIONS = [
     "敬拜讚美隊",
     "主日學老師",
     "音控與直播組",
     "招待與款待組",
     "聖餐服侍組",
-    CUSTOM_OPTION_KEYWORD
+    OPTION_CUSTOM_ROLE
 ]
-LABEL_CUSTOM_ROLE = "請輸入自訂事奉崗位名稱"
+LABEL_CUSTOM_ROLE_INPUT = "請輸入自訂事奉崗位名稱"
 LABEL_SERVICE_WORKERS = "服侍同工名單（多人請用逗點分隔）"
 HELP_SERVICE_WORKERS = "例如：張小明, 李大華, John Doe"
 
 # Dynamic Options - Venue Booking
 LABEL_VENUE_NAME = "借用場地/房間"
+OPTION_CUSTOM_VENUE = "其他 / 請自行於下方輸入"
 VENUE_OPTIONS = [
     "大堂 (Main Sanctuary)",
     "副堂 (Fellowship Hall)",
     "小組教室 A (Room A)",
     "小組教室 B (Room B)",
     "舞蹈/練琴房 (Music Room)",
-    CUSTOM_OPTION_KEYWORD
+    OPTION_CUSTOM_VENUE
 ]
-LABEL_CUSTOM_VENUE = "請輸入自訂場地/房間名稱"
+LABEL_CUSTOM_VENUE_INPUT = "請輸入自訂場地/房間名稱"
 
 # Time Configuration
 LABEL_TIME_OPTION = "時間設定方式"

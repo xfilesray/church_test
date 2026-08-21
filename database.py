@@ -4,6 +4,7 @@ database.py - 處理 Supabase 資料庫連線、CRUD 操作與衝突檢測 logic
 """
 
 import os
+import pandas as pd
 import streamlit as st
 from supabase import create_client, Client
 
@@ -105,67 +106,59 @@ def save_ministry_roster(event_date, time_slot, roles_dict, all_workers, is_forc
     res = supabase.table("ministry_rosters").insert(data).execute()
     return res
     
-# ==========================================
-# 資料讀取/查詢函數 (Data Retrieval)
-# ==========================================
-def fetch_grace_logs():
-    """讀取所有恩典體會紀錄"""
-    res = supabase.table("grace_logs").select("*").order("event_date", desc=True).execute()
-    return res.data
-
-def fetch_venue_bookings():
-    """讀取所有場地預約紀錄"""
-    res = supabase.table("venue_bookings").select("*").order("event_date", desc=True).execute()
-    return res.data
-
-def fetch_ministry_rosters():
-    """讀取所有事奉排班紀錄"""
-    res = supabase.table("ministry_rosters").select("*").order("event_date", desc=True).execute()
-    return res.data
+# ------------------------------------------
+# Module D: Search Logic
+# ------------------------------------------
+def query_records(table_name: str, keyword: str = "", start_date=None, end_date=None) -> pd.DataFrame:
+    """跨模組動態查詢邏輯，支援 Python 端的 case=False 模糊比對與日期過濾"""
+    query = supabase.table(table_name).select("*")
     
-# ==========================================
-# 同工名單管理 (Church Workers Management)
-# ==========================================
-def fetch_church_workers():
-    """動態讀取所有啟用的同工名單"""
-    res = supabase.table("church_workers") \
-        .select("name") \
-        .eq("is_active", True) \
-        .order("name") \
-        .execute()
-    return [row["name"] for row in res.data] if res.data else []
-
-def add_church_worker(worker_name):
-    """新增新同工至資料庫（若已存在則忽略）"""
-    if not worker_name or not worker_name.strip():
-        return None
-    data = {"name": worker_name.strip()}
-    res = supabase.table("church_workers").upsert(data, on_conflict="name").execute()
-    return res
+    # 執行資料庫查詢
+    response = query.execute()
+    data = response.data
     
-# ==========================================
-# 同工名單管理進階函數 (Worker Management)
-# ==========================================
-def fetch_all_church_workers():
-    """讀取所有同工（包含已停用者），供管理者維護"""
-    res = supabase.table("church_workers") \
-        .select("*") \
-        .order("id", desc=False) \
-        .execute()
-    return res.data if res.data else []
+    if not data:
+        return pd.DataFrame()
+        
+    df = pd.DataFrame(data)
+    
+    # 日期區間過濾
+    date_col = "created_at" if "created_at" in df.columns else ("booking_date" if "booking_date" in df.columns else "service_date")
+    if date_col in df.columns and (start_date or end_date):
+        df[date_col] = pd.to_datetime(df[date_col]).dt.date
+        if start_date:
+            df = df[df[date_col] >= start_date]
+        if end_date:
+            df = df[df[date_col] <= end_date]
+            
+    # 全欄位關鍵字不限大小寫比對 (case=False)
+    if keyword.strip():
+        kw = keyword.strip().lower()
+        mask = df.astype(str).apply(lambda row: row.str.lower().str.contains(kw, na=False)).any(axis=1)
+        df = df[mask]
+        
+    return df
 
-def update_worker_status(worker_id: int, is_active: bool):
-    """更新同工啟用/停用狀態"""
-    res = supabase.table("church_workers") \
-        .update({"is_active": is_active}) \
-        .eq("id", worker_id) \
-        .execute()
-    return res
+# ------------------------------------------
+# Module D: Worker Management Logic
+# ------------------------------------------
+def get_all_workers() -> pd.DataFrame:
+    """取得完整同工清單"""
+    res = supabase.table("workers").select("*").order("name").execute()
+    return pd.DataFrame(res.data) if res.data else pd.DataFrame()
 
-def delete_worker(worker_id: int):
-    """自資料庫永久刪除同工"""
-    res = supabase.table("church_workers") \
-        .delete() \
-        .eq("id", worker_id) \
-        .execute()
-    return res
+def add_worker(name: str, primary_role: str, status: str = "在籍 (Active)") -> bool:
+    """新增同工紀錄"""
+    payload = {"name": name.strip(), "primary_role": primary_role, "status": status}
+    res = supabase.table("workers").insert(payload).execute()
+    return len(res.data) > 0
+
+def update_worker_status(worker_id: int, new_status: str) -> bool:
+    """更新指定同工狀態"""
+    res = supabase.table("workers").update({"status": new_status}).eq("id", worker_id).execute()
+    return len(res.data) > 0
+
+def delete_worker(worker_id: int) -> bool:
+    """刪除指定同工"""
+    res = supabase.table("workers").delete().eq("id", worker_id).execute()
+    return len(res.data) > 0

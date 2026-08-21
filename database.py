@@ -104,3 +104,21 @@ def save_ministry_roster(event_date, time_slot, roles_dict, all_workers, is_forc
     }
     res = supabase.table("ministry_rosters").insert(data).execute()
     return res
+    
+# ==========================================
+# 資料讀取/查詢函數 (Data Retrieval)
+# ==========================================
+def fetch_grace_logs():
+    """讀取所有恩典體會紀錄"""
+    res = supabase.table("grace_logs").select("*").order("event_date", desc=True).execute()
+    return res.data
+
+def fetch_venue_bookings():
+    """讀取所有場地預約紀錄"""
+    res = supabase.table("venue_bookings").select("*").order("event_date", desc=True).execute()
+    return res.data
+
+def fetch_ministry_rosters():
+    """讀取所有事奉排班紀錄"""
+    res = supabase.table("ministry_rosters").select("*").order("event_date", desc=True).execute()
+    return res.data

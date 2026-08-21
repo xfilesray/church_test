@@ -176,13 +176,14 @@ with st.sidebar.form(key="f_main", clear_on_submit=False):
     time_str = t_in.strftime("%H:%M")
 
     # 動態選單：選擇小組/單位（包含自訂選項）
-    sel_group = st.selectbox("請選擇小組/單位", dynamic_groups)
-    if sel_group == c.OTHER_CUSTOM_TRIGGER:
-        final_group = st.text_input(
-            "自訂小組/單位名稱", placeholder="請輸入新小組名稱..."
-        )
-    else:
-        final_group = sel_group
+   # 下拉選單：請選擇小組
+sel_group = st.selectbox("請選擇小組", dynamic_groups)
+
+# 判斷：只有當選擇「其他 / 請自行於下方輸入」時，才會展開輸入框
+if sel_group == c.OTHER_CUSTOM_TRIGGER:
+    final_group = st.text_input("自訂小組名稱", placeholder="請輸入新小組名稱...")
+else:
+    final_group = sel_group
 
     if selected_type_key == "ROOMS":
         # 動態選單：選擇場地/房間（包含自訂選項）
@@ -206,13 +207,14 @@ with st.sidebar.form(key="f_main", clear_on_submit=False):
     else:
         final_room = ""
         # 動態選單：選擇事奉崗位（包含自訂選項）
-        sel_role = st.selectbox("請選擇事奉崗位", dynamic_roles)
-        if sel_role == c.OTHER_CUSTOM_TRIGGER:
-            role = st.text_input(
-                "自訂崗位名稱", placeholder="請輸入新崗位名稱..."
-            )
-        else:
-            role = sel_role
+        # 下拉選單：請選擇事奉崗位
+sel_role = st.selectbox("請選擇事奉崗位", dynamic_roles)
+
+# 判斷：只有當選擇「其他 / 請自行於下方輸入」時，才會展開輸入框
+if sel_role == c.OTHER_CUSTOM_TRIGGER:
+    role = st.text_input("自訂崗位名稱", placeholder="請輸入新崗位名稱...")
+else:
+    role = sel_role
 
         content = st.text_input(
             "事奉/聚會內容摘要", placeholder="例如：主日敬拜聚會"

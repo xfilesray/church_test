@@ -31,20 +31,26 @@ TYPE_VENUE = "🏠 教會房間/場地借用"
 
 RECORD_TYPES = [TYPE_GRACE, TYPE_SERVICE, TYPE_VENUE]
 
-# Dynamic Options - Service Roster
-LABEL_SERVICE_ROLE = "事奉崗位"
+# Dynamic Options - Service Role Options (Shared across Grace Journal & Service Roster)
 OPTION_CUSTOM_ROLE = "其他 / 請自行於下方輸入"
 SERVICE_ROSTER_OPTIONS = [
+    "不指定 / 個人靈修感恩",
     "敬拜讚美隊",
     "主日學老師",
     "音控與直播組",
     "招待與款待組",
-    "聖餐服侍組",
+    "聖餐服侍组",
     OPTION_CUSTOM_ROLE
 ]
+
+# Labels for Service Roster
+LABEL_SERVICE_ROLE = "事奉崗位"
 LABEL_CUSTOM_ROLE_INPUT = "請輸入自訂事奉崗位名稱"
 LABEL_SERVICE_WORKERS = "服侍同工名單（多人請用逗點分隔）"
 HELP_SERVICE_WORKERS = "例如：張小明, 李大華, John Doe"
+
+# Labels for Grace Journal
+LABEL_GRACE_ROLE = "關聯事奉崗位 (選填/可選不指定)"
 
 # Dynamic Options - Venue Booking
 LABEL_VENUE_NAME = "借用場地/房間"

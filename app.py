@@ -11,7 +11,7 @@ st.caption(c.APP_SUBTITLE)
 st.divider()
 
 # ==========================================
-# 1. Shared Section: Date & Time
+# 1. 共用時段選擇器 (Shared Date & Time)
 # ==========================================
 st.subheader(c.LABELS["date_section"])
 col_date, col_time = st.columns(2)
@@ -30,16 +30,17 @@ with col_time:
 st.divider()
 
 # ==========================================
-# 2. Main Module Tabs
+# 2. 四大模組分頁 (新增 Tab 4: 🔍 查詢紀錄)
 # ==========================================
-tab_grace, tab_venue, tab_roster = st.tabs([
+tab_grace, tab_venue, tab_roster, tab_viewer = st.tabs([
     c.LABELS["tab_grace"], 
     c.LABELS["tab_venue"], 
-    c.LABELS["tab_roster"]
+    c.LABELS["tab_roster"],
+    "🔍 查詢紀錄"  # 👈 新增查詢版面
 ])
 
 # ------------------------------------------
-# Module A: Grace & Experience Log
+# Module A: 恩典與體會紀錄
 # ------------------------------------------
 with tab_grace:
     st.header(c.LABELS["grace_header"])
@@ -65,12 +66,10 @@ with tab_grace:
             if not worker_name.strip():
                 st.error("❌ 請輸入同工姓名！")
             else:
-                # 1. 處理自訂選項整合
                 final_gifts = [g for g in selected_gifts if g != "其他 / 請自行於下方輸入"]
                 if custom_gift_val.strip():
                     final_gifts.append(custom_gift_val.strip())
                 
-                # 2. 呼叫 database.py 寫入 Supabase
                 try:
                     db.save_grace_log(
                         event_date=selected_date,
@@ -85,7 +84,7 @@ with tab_grace:
                     st.error(f"❌ 儲存失敗：{e}")
 
 # ------------------------------------------
-# Module B: Venue Reservation
+# Module B: 場地借用
 # ------------------------------------------
 with tab_venue:
     st.header(c.LABELS["venue_header"])
@@ -112,14 +111,12 @@ with tab_venue:
             if not final_venue.strip() or not applicant_name.strip():
                 st.error("❌ 請填寫完整的場地名稱與申請人資訊！")
             else:
-                # 1. 查詢資料庫確認是否場地撞期
                 has_conflict = db.check_venue_conflict(
                     event_date=selected_date, 
                     time_slot=selected_time_slot, 
                     venue_name=final_venue
                 )
                 
-                # 2. 若撞期且未勾選強制儲存，發出警示；否則寫入資料庫
                 if has_conflict and not force_save_venue:
                     st.error(f"⚠️ 衝突警示：[{final_venue}] 在此時段已被預約！若需覆蓋請勾選強制儲存。")
                 else:
@@ -137,7 +134,7 @@ with tab_venue:
                         st.error(f"❌ 儲存失敗：{e}")
 
 # ------------------------------------------
-# Module C: Ministry Roster
+# Module C: 事奉時間表
 # ------------------------------------------
 with tab_roster:
     st.header(c.LABELS["roster_header"])
@@ -162,7 +159,6 @@ with tab_roster:
         submit_roster = st.form_submit_button(c.LABELS["btn_save_roster"])
         
         if submit_roster:
-            # 1. 解析同工姓名（相容中英文逗號）
             def parse_names(input_str):
                 if not input_str:
                     return []
@@ -177,11 +173,9 @@ with tab_roster:
                 parse_names(other_roles)
             )
             
-            # 2. 檢測單表單內重複排班
             seen = set()
             self_duplicates = [w for w in all_assigned_workers if w in seen or seen.add(w)]
             
-            # 3. 檢測資料庫內跨紀錄重複排班
             db_conflicts = db.check_roster_conflict(
                 event_date=selected_date, 
                 time_slot=selected_time_slot, 
@@ -190,7 +184,6 @@ with tab_roster:
             
             all_conflicts = list(set(self_duplicates + db_conflicts))
             
-            # 4. 判斷是否阻擋或寫入
             if all_conflicts and not force_save_roster:
                 st.warning(f"⚠️ 重複排班提醒：同工 [{', '.join(all_conflicts)}] 在此時段被指派了多個崗位！若確認無誤請勾選強制儲存。")
             else:
@@ -213,3 +206,117 @@ with tab_roster:
                     st.success("✅ 事奉時間表已成功發布並存入資料庫！")
                 except Exception as e:
                     st.error(f"❌ 發布失敗：{e}")
+
+# ------------------------------------------
+# Module D: 🔍 查詢紀錄版面 (Data Viewer)
+# ------------------------------------------
+with tab_viewer:
+    st.header("🔍 教會事奉數據與紀錄查詢")
+    
+    # 重新載入按鈕
+    if st.button("🔄 重新整理資料"):
+        st.rerun()
+        
+    sub_tab1, sub_tab2, sub_tab3 = st.tabs([
+        "📖 恩典日記紀錄", 
+        "🏠 場地預約紀錄", 
+        "📅 事奉排班時間表"
+    ])
+    
+    # 1. 恩典日記紀錄
+    with sub_tab1:
+        st.subheader("📖 恩典與體會歷史紀錄")
+        try:
+            grace_data = db.fetch_grace_logs()
+            if grace_data:
+                df_grace = pd.DataFrame(grace_data)
+                
+                # 關鍵字搜尋
+                search_term = st.text_input("🔍 搜尋同工姓名或心得關鍵字：", key="search_grace")
+                if search_term:
+                    df_grace = df_grace[
+                        df_grace["worker_name"].str.contains(search_term, na=False) |
+                        df_grace["reflection"].str.contains(search_term, na=False)
+                    ]
+                
+                # 重新整理顯示欄位名稱
+                df_grace_display = df_grace.rename(columns={
+                    "event_date": "日期",
+                    "time_slot": "時段",
+                    "worker_name": "同工姓名",
+                    "spiritual_gifts": "服侍恩賜/項目",
+                    "reflection": "恩典體會與心得",
+                    "prayer_requests": "代禱事項",
+                    "created_at": "建立時間"
+                })
+                
+                st.dataframe(df_grace_display, use_container_width=True)
+            else:
+                st.info("尚無任何恩典日記紀錄。")
+        except Exception as e:
+            st.error(f"資料讀取失敗：{e}")
+
+    # 2. 場地預約紀錄
+    with sub_tab2:
+        st.subheader("🏠 場地借用歷史紀錄")
+        try:
+            venue_data = db.fetch_venue_bookings()
+            if venue_data:
+                df_venue = pd.DataFrame(venue_data)
+                
+                # 關鍵字搜尋
+                search_venue = st.text_input("🔍 搜尋場地名稱或申請人：", key="search_venue")
+                if search_venue:
+                    df_venue = df_venue[
+                        df_venue["venue_name"].str.contains(search_venue, na=False) |
+                        df_venue["applicant_name"].str.contains(search_venue, na=False)
+                    ]
+                
+                df_venue_display = df_venue.rename(columns={
+                    "event_date": "日期",
+                    "time_slot": "時段",
+                    "venue_name": "借用場地",
+                    "applicant_name": "申請人/單位",
+                    "event_purpose": "聚會用途",
+                    "is_forced": "強制儲存",
+                    "created_at": "申請時間"
+                })
+                
+                st.dataframe(df_venue_display, use_container_width=True)
+            else:
+                st.info("尚無任何場地預約紀錄。")
+        except Exception as e:
+            st.error(f"資料讀取失敗：{e}")
+
+    # 3. 事奉排班時間表
+    with sub_tab3:
+        st.subheader("📅 事奉時間表歷史紀錄")
+        try:
+            roster_data = db.fetch_ministry_rosters()
+            if roster_data:
+                df_roster = pd.DataFrame(roster_data)
+                
+                # 關鍵字搜尋
+                search_roster = st.text_input("🔍 搜尋同工姓名或崗位：", key="search_roster")
+                if search_roster:
+                    df_roster = df_roster[
+                        df_roster["all_workers"].astype(str).str.contains(search_roster, na=False)
+                    ]
+                
+                df_roster_display = df_roster.rename(columns={
+                    "event_date": "日期",
+                    "time_slot": "時段",
+                    "worship_lead": "敬拜主領",
+                    "speaker": "講員/證道",
+                    "av_team": "音控/直播",
+                    "usher_team": "招待/迎賓",
+                    "sunday_school": "主日學老師",
+                    "other_roles": "其他崗位",
+                    "created_at": "發布時間"
+                })
+                
+                st.dataframe(df_roster_display, use_container_width=True)
+            else:
+                st.info("尚無任何排班紀錄。")
+        except Exception as e:
+            st.error(f"資料讀取失敗：{e}")

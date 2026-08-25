@@ -85,33 +85,74 @@ with tab_venue:
                 if success:
                     st.success("場地預約申請提交成功！")
 
-# ── 行數 112-160：模組 C (📅 事奉排班時間表與智慧防錯) ──
+
+# ── 模組 C (📅 事奉排班時間表 - 下拉式選單版) ──
 with tab_roster:
     st.header(c.LABELS["roster_header"])
-    st.caption(c.LABELS["roster_hint"])
+    st.caption(c.LABELS["roster_select_hint"])
     
+    # 1. 動態撈取資料庫同工名單
+    worker_options = db.get_active_worker_names()
+    if not worker_options:
+        # 若資料庫無資料，提供預設展示選單
+        worker_options = ["張弟兄", "李姊妹", "陳執事", "王弟兄", "黃姊妹"]
+
     col_c1, col_c2 = st.columns(2)
+    
     with col_c1:
-        worship_lead = st.text_input(c.LABELS["worship_lead"])
-        speaker = st.text_input(c.LABELS["speaker"])
-        av_team = st.text_input(c.LABELS["av_team"])
+        # 講員：通常為單人，使用 selectbox (可保留空白或選擇)
+        speaker = st.selectbox(
+            c.LABELS["speaker"], 
+            options=[""] + worker_options, 
+            index=0
+        )
+        
+        # 敬拜主領與團隊：可複選
+        worship_lead = st.multiselect(
+            c.LABELS["worship_lead"], 
+            options=worker_options,
+            placeholder=c.LABELS["unselected_placeholder"]
+        )
+        
+        # 影音/音控團隊：可複選
+        av_team = st.multiselect(
+            c.LABELS["av_team"], 
+            options=worker_options,
+            placeholder=c.LABELS["unselected_placeholder"]
+        )
+
     with col_c2:
-        usher_team = st.text_input(c.LABELS["usher_team"])
-        sunday_school = st.text_input(c.LABELS["sunday_school"])
-        other_roles = st.text_input(c.LABELS["other_roles"])
+        # 招待團隊：可複選
+        usher_team = st.multiselect(
+            c.LABELS["usher_team"], 
+            options=worker_options,
+            placeholder=c.LABELS["unselected_placeholder"]
+        )
+        
+        # 主日學老師：可複選
+        sunday_school = st.multiselect(
+            c.LABELS["sunday_school"], 
+            options=worker_options,
+            placeholder=c.LABELS["unselected_placeholder"]
+        )
+        
+        # 其他事奉或手動補充（保留文字輸入框以防有臨時同工）
+        other_roles = st.text_input(c.LABELS["other_roles"], placeholder="可輸入其他未在下拉名單中的同工，多位請用逗號分隔")
         
     force_save_roster = st.checkbox(c.LABELS["force_save_roster"])
     
+    # 2. 整合資料格式（轉換為 List 或 String 以利儲存與檢查）
     roles_data = {
+        c.LABELS["speaker"]: [speaker] if speaker else [],
         c.LABELS["worship_lead"]: worship_lead,
-        c.LABELS["speaker"]: speaker,
         c.LABELS["av_team"]: av_team,
         c.LABELS["usher_team"]: usher_team,
         c.LABELS["sunday_school"]: sunday_school,
-        c.LABELS["other_roles"]: other_roles
+        c.LABELS["other_roles"]: db.parse_worker_names(other_roles) if other_roles else []
     }
     
     if st.button(c.LABELS["btn_save_roster"], type="primary"):
+        # 進行智慧衝突檢查
         has_conflict, warnings = db.check_roster_conflict(date_str, selected_time, roles_data)
         
         if has_conflict and not force_save_roster:
@@ -120,10 +161,12 @@ with tab_roster:
                 st.write(f"- {w}")
             st.info("如為一人兼任多職或聯合聚會，請勾選「強制儲存 (Force Save)」後再點擊發布。")
         else:
-            success = db.save_roster_record(date_str, selected_time, roles_data)
+            # 將多選的列表資料轉為以逗號分隔的字串，儲存至 Supabase
+            save_payload = {role: ", ".join(names) for role, names in roles_data.items() if names}
+            
+            success = db.save_roster_record(date_str, selected_time, save_payload)
             if success:
-                st.success("事奉時間表已成功發布！")
-
+                st.success("🎉 事奉時間表已成功發布！")
 # ── 行數 162-200：模組 D (🔍 查詢與管理版面) ──
 with tab_search:
     st.header(c.LABELS["search_header"])

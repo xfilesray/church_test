@@ -97,3 +97,24 @@ LABELS = {
     "msg_worker_deleted": "已成功刪除同工！",
     "confirm_delete_worker": "確定要永久刪除此同工嗎？"
 }
+
+# ── constants.py ──
+
+LABELS = {
+    # ... 原有標籤維持不變 ...
+    
+    # Tab 3: 排班時間表 (拉頁目錄相關)
+    "roster_header": "📅 未來事奉時間表 (團隊排班)",
+    "worship_lead": "敬拜主領",
+    "speaker": "講員 / 證道",
+    "av_team": "音控 / 直播同工",
+    "usher_team": "招待 / 迎賓同工",
+    "sunday_school": "主日學老師",
+    "other_roles": "其他事奉同工",
+    "roster_select_hint": "💡 請從下拉選單選擇同工（可多選），若不在名單中可於下方手動補充",
+    "unselected_placeholder": "請選擇同工...",
+    "force_save_roster": "⚠️ 若有重複排班警示，仍強制儲存 (Force Save)",
+    "btn_save_roster": "發布事奉時間表",
+    
+    # ... 其餘標籤 ...
+}

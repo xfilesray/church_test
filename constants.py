@@ -3,11 +3,9 @@
 constants.py - 集中管理繁體中文 UI 標籤、對照表與預設選項
 """
 
-# App 系統設定
 APP_TITLE = "⛪ 教會事奉管理與恩典紀錄系統"
 APP_SUBTITLE = "專為教會同工與團隊設計的一站式事奉排班、場地借用與恩典紀錄平台"
 
-# 共用時段選項
 TIME_SLOT_OPTIONS = [
     "早堂 (08:00 - 10:00)",
     "主日堂 (10:00 - 12:00)",
@@ -16,7 +14,6 @@ TIME_SLOT_OPTIONS = [
     "其他 / 請自行於下方輸入"
 ]
 
-# 模組 A：事奉恩賜與體會
 GRACE_GIFTS_OPTIONS = [
     "講道 / 分享",
     "敬拜讚美 / 樂手",
@@ -28,7 +25,6 @@ GRACE_GIFTS_OPTIONS = [
     "其他 / 請自行於下方輸入"
 ]
 
-# 模組 B：場地借用
 VENUE_OPTIONS = [
     "大堂 (Main Sanctuary)",
     "副堂 (Side Chapel)",
@@ -38,9 +34,8 @@ VENUE_OPTIONS = [
     "其他 / 請自行於下方輸入"
 ]
 
-# UI 文字標籤 (UI Labels)
 LABELS = {
-    # ── 主選單 Tab 標籤 ──
+    # 主選單 Tab 標籤
     "tab_grace": "📖 恩典與體會紀錄",
     "tab_venue": "🏠 場地借用",
     "tab_roster": "📅 事奉排班時間表",
@@ -52,7 +47,6 @@ LABELS = {
     "custom_time": "請輸入自訂時段",
     
     # Tab 1: 恩賜與體會
-    "tab_grace": "📖 紀錄事奉恩賜",
     "grace_header": "📖 紀錄事奉恩賜與心得日記",
     "worker_name": "同工姓名",
     "gifts_select": "事奉恩賜 / 服侍項目",
@@ -62,7 +56,6 @@ LABELS = {
     "btn_save_grace": "儲存恩賜紀錄",
     
     # Tab 2: 場地借用
-    "tab_venue": "🏠 借用場地",
     "venue_header": "🏠 教會房間 / 場地借用申請",
     "venue_select": "選擇借用場地 / 房間",
     "custom_venue": "請輸入自訂場地名稱",
@@ -72,7 +65,6 @@ LABELS = {
     "btn_save_venue": "提交場地借用申請",
     
     # Tab 3: 排班時間表
-    "tab_roster": "📅 事奉時間表",
     "roster_header": "📅 未來事奉時間表 (團隊排班)",
     "worship_lead": "敬拜主領",
     "speaker": "講員 / 證道",
@@ -84,27 +76,20 @@ LABELS = {
     "force_save_roster": "⚠️ 若有重複排班警示，仍強制儲存 (Force Save)",
     "btn_save_roster": "發布事奉時間表",
 
-    # ── 模組 D (查詢與同工管理) 標籤 ──
+    # Tab 4: 查詢與管理
     "search_header": "🔍 紀錄查詢與系統管理",
     "subtab_query": "🔍 紀錄查詢",
     "subtab_worker_mgmt": "👥 同工名單管理",
-
-    # 查詢子功能標籤
     "select_module": "選擇查詢模組",
     "search_keyword": "關鍵字搜尋 (支援姓名、內容、用途等)",
     "date_range": "日期區間篩選",
     "btn_search": "執行查詢",
     "no_data_found": "查無符合條件的紀錄。",
     "export_csv": "📥 下載查詢結果 (CSV)",
-
-    "tab_worker_mgmt": "👥 同工名單管理",
-    
-    # 同工管理標籤
     "add_worker_header": "➕ 新增同工",
     "worker_name_input": "同工姓名",
     "worker_role_select": "主要事奉領域",
     "btn_add_worker": "新增同工",
-    
     "worker_mgmt_header": "👥 同工名單與狀態維護",
     "btn_update_status": "更新狀態",
     "btn_delete_worker": "刪除同工",

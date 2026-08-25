@@ -138,3 +138,73 @@ def query_records(table_name: str, keyword: str = "", start_date: str = None, en
         df = df[mask]
         
     return df
+
+# ── database.py ──
+
+# 新增：撈取活躍同工名單 (供下拉選單選取)
+def get_active_worker_names() -> List[str]:
+    """取得目前系統中狀態為啟用 (Active) 的同工姓名列表"""
+    try:
+        supabase = get_client()
+        res = supabase.table("workers").select("name").eq("status", "Active").execute()
+        if res.data:
+            return [w["name"] for w in res.data if w.get("name")]
+        return []
+    except Exception:
+        # 若資料庫尚未建立 workers 表，回傳預設空清單
+        return []
+
+# 修正：支援列表與字串格式的排班防撞檢查
+def check_roster_conflict(date_str: str, time_slot: str, current_roles: Dict[str, any]) -> Tuple[bool, List[str]]:
+    """
+    檢查：
+    1. 表單內部是否有同一同工兼任多職 (接受 List[str] 或逗號分隔字串)
+    2. 雲端資料庫同日同場次是否已有該同工的事奉排班
+    """
+    warnings = []
+    
+    # 1. 表單內部重複性檢測
+    role_mapping = {}
+    all_workers = []
+    
+    for role, value in current_roles.items():
+        # 自動適應 List 或 String 輸入
+        if isinstance(value, list):
+            parsed = value
+        else:
+            parsed = parse_worker_names(str(value))
+            
+        for name in parsed:
+            if not name:
+                continue
+            if name in role_mapping:
+                warnings.append(f"同工【{name}】在本次排班中同時擔任「{role_mapping[name]}」與「{role}」")
+            else:
+                role_mapping[name] = role
+            all_workers.append(name)
+
+    # 2. 雲端資料庫跨紀錄檢測
+    if all_workers:
+        try:
+            supabase = get_client()
+            res = supabase.table("roster_records") \
+                .select("roles_data") \
+                .eq("event_date", date_str) \
+                .eq("time_slot", time_slot) \
+                .execute()
+            
+            for record in res.data:
+                existing_roles = record.get("roles_data", {})
+                for role, names_val in existing_roles.items():
+                    if isinstance(names_val, list):
+                        existing_names = names_val
+                    else:
+                        existing_names = parse_worker_names(str(names_val))
+                    
+                    for w in set(all_workers):
+                        if w in existing_names:
+                            warnings.append(f"同工【{w}】在資料庫同日同場次已有排班記錄（崗位：{role}）")
+        except Exception as e:
+            pass
+
+    return len(warnings) > 0, warnings

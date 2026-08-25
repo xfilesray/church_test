@@ -1,164 +1,140 @@
 # -*- coding: utf-8 -*-
 """
-database.py - 處理 Supabase 資料庫連線、CRUD 操作與衝突檢測 logic
+database.py - 專責 Supabase (PostgreSQL) CRUD 與衝突檢測
 """
 
 import os
+import re
 import pandas as pd
-import streamlit as st
+from typing import List, Dict, Tuple
 from supabase import create_client, Client
 
-# 初始化 Supabase 連線 (從 secrets 或環境變數讀取)
-@st.cache_resource
-def init_supabase() -> Client:
-    url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-    key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
-    
-    if not url or not key:
-        st.error("❌ 未設定 Supabase URL 或 Key！請檢查 .streamlit/secrets.toml")
-        st.stop()
-        
-    return create_client(url, key)
+# Supabase 初始化
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
-supabase = init_supabase()
+def get_client() -> Client:
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise ValueError("Supabase URL 及 Key 未設定，請配置環境變數。")
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ==========================================
-# 模組 A: 恩典與體會紀錄 (Grace Logs)
-# ==========================================
-def save_grace_log(event_date, time_slot, worker_name, gifts, reflection, prayer):
-    """新增恩典紀錄"""
+# ── 輔助函式：分隔解析多位同工 ──
+def parse_worker_names(name_string: str) -> List[str]:
+    """解析以中英文逗號或頓號分隔的同工姓名，並去除空白與空值"""
+    if not name_string:
+        return []
+    names = re.split(r'[,，、]', name_string)
+    return [name.strip() for name in names if name.strip()]
+
+# ── 模組 A：恩典紀錄 ──
+def save_grace_record(date_str: str, time_slot: str, worker_name: str, gift: str, reflection: str, prayer: str) -> bool:
+    supabase = get_client()
     data = {
-        "event_date": str(event_date),
+        "event_date": date_str,
         "time_slot": time_slot,
         "worker_name": worker_name,
-        "spiritual_gifts": gifts,
+        "gift_item": gift,
         "reflection": reflection,
-        "prayer_requests": prayer
+        "prayer_item": prayer
     }
-    res = supabase.table("grace_logs").insert(data).execute()
-    return res
-
-# ==========================================
-# 模組 B: 場地借用 (Venue Bookings & Conflicts)
-# ==========================================
-def check_venue_conflict(event_date, time_slot, venue_name):
-    """檢查同日期、同時間、同場地是否已被預約"""
-    res = supabase.table("venue_bookings") \
-        .select("*") \
-        .eq("event_date", str(event_date)) \
-        .eq("time_slot", time_slot) \
-        .eq("venue_name", venue_name) \
-        .execute()
-    
+    res = supabase.table("grace_records").insert(data).execute()
     return len(res.data) > 0
 
-def save_venue_booking(event_date, time_slot, venue_name, applicant, purpose, is_forced=False):
-    """寫入場地預約"""
+# ── 模組 B：場地防撞檢查與儲存 ──
+def check_venue_conflict(date_str: str, time_slot: str, venue: str) -> Tuple[bool, List[Dict]]:
+    """檢查場地在相同日期與時段是否已被預約"""
+    supabase = get_client()
+    res = supabase.table("venue_bookings") \
+        .select("*") \
+        .eq("event_date", date_str) \
+        .eq("time_slot", time_slot) \
+        .eq("venue_name", venue) \
+        .execute()
+    has_conflict = len(res.data) > 0
+    return has_conflict, res.data
+
+def save_venue_booking(date_str: str, time_slot: str, venue: str, applicant: str, purpose: str) -> bool:
+    supabase = get_client()
     data = {
-        "event_date": str(event_date),
+        "event_date": date_str,
         "time_slot": time_slot,
-        "venue_name": venue_name,
-        "applicant_name": applicant,
-        "event_purpose": purpose,
-        "is_forced": is_forced
+        "venue_name": venue,
+        "applicant": applicant,
+        "purpose": purpose
     }
     res = supabase.table("venue_bookings").insert(data).execute()
-    return res
+    return len(res.data) > 0
 
-# ==========================================
-# 模組 C: 事奉時間表 (Ministry Rosters & Conflicts)
-# ==========================================
-def check_roster_conflict(event_date, time_slot, worker_list):
-    """檢查同工在同一時段是否已在其他排班中被指派"""
-    if not worker_list:
-        return []
+# ── 模組 C：排班重複檢查與儲存 ──
+def check_roster_conflict(date_str: str, time_slot: str, current_roles: Dict[str, str]) -> Tuple[bool, List[str]]:
+    """
+    檢查：
+    1. 表單內部是否有同一同工兼任多職
+    2. 雲端資料庫同日同場次是否已有該同工的事奉排班
+    """
+    warnings = []
+    
+    # 1. 表單內部重覆性檢測
+    all_workers = []
+    role_mapping = {}
+    for role, names_str in current_roles.items():
+        parsed = parse_worker_names(names_str)
+        for name in parsed:
+            if name in role_mapping:
+                warnings.append(f"同工【{name}】在本次排班中同時擔任「{role_mapping[name]}」與「{role}」")
+            else:
+                role_mapping[name] = role
+            all_workers.append(name)
+
+    # 2. 雲端資料庫跨紀錄檢測
+    if all_workers:
+        supabase = get_client()
+        res = supabase.table("roster_records") \
+            .select("roles_data") \
+            .eq("event_date", date_str) \
+            .eq("time_slot", time_slot) \
+            .execute()
         
-    # 查詢同日期同時間已存在的排班
-    res = supabase.table("ministry_rosters") \
-        .select("all_workers") \
-        .eq("event_date", str(event_date)) \
-        .eq("time_slot", time_slot) \
-        .execute()
-    
-    conflicted_workers = set()
-    for row in res.data:
-        existing_workers = row.get("all_workers") or []
-        for worker in worker_list:
-            if worker in existing_workers:
-                conflicted_workers.add(worker)
-                
-    return list(conflicted_workers)
+        for record in res.data:
+            existing_roles = record.get("roles_data", {})
+            for role, names_str in existing_roles.items():
+                existing_names = parse_worker_names(str(names_str))
+                for w in set(all_workers):
+                    if w in existing_names:
+                        warnings.append(f"同工【{w}】在資料庫同日同場次已有排班記錄（崗位：{role}）")
 
-def save_ministry_roster(event_date, time_slot, roles_dict, all_workers, is_forced=False):
-    """儲存/更新事奉時間表"""
+    return len(warnings) > 0, warnings
+
+def save_roster_record(date_str: str, time_slot: str, roles_data: Dict[str, str]) -> bool:
+    supabase = get_client()
     data = {
-        "event_date": str(event_date),
+        "event_date": date_str,
         "time_slot": time_slot,
-        "worship_lead": roles_dict.get("worship_lead", ""),
-        "speaker": roles_dict.get("speaker", ""),
-        "av_team": roles_dict.get("av_team", ""),
-        "usher_team": roles_dict.get("usher_team", ""),
-        "sunday_school": roles_dict.get("sunday_school", ""),
-        "other_roles": roles_dict.get("other_roles", ""),
-        "all_workers": all_workers,
-        "is_forced": is_forced
+        "roles_data": roles_data
     }
-    res = supabase.table("ministry_rosters").insert(data).execute()
-    return res
-    
-# ------------------------------------------
-# Module D: Search Logic
-# ------------------------------------------
-def query_records(table_name: str, keyword: str = "", start_date=None, end_date=None) -> pd.DataFrame:
-    """跨模組動態查詢邏輯，支援 Python 端的 case=False 模糊比對與日期過濾"""
+    res = supabase.table("roster_records").insert(data).execute()
+    return len(res.data) > 0
+
+# ── 模組 D：不限大小寫 & 跨中英文關鍵字查詢 ──
+def query_records(table_name: str, keyword: str = "", start_date: str = None, end_date: str = None) -> pd.DataFrame:
+    supabase = get_client()
     query = supabase.table(table_name).select("*")
     
-    # 執行資料庫查詢
-    response = query.execute()
-    data = response.data
-    
-    if not data:
-        return pd.DataFrame()
+    if start_date:
+        query = query.gte("event_date", start_date)
+    if end_date:
+        query = query.lte("event_date", end_date)
         
-    df = pd.DataFrame(data)
+    res = query.execute()
+    df = pd.DataFrame(res.data)
     
-    # 日期區間過濾
-    date_col = "created_at" if "created_at" in df.columns else ("booking_date" if "booking_date" in df.columns else "service_date")
-    if date_col in df.columns and (start_date or end_date):
-        df[date_col] = pd.to_datetime(df[date_col]).dt.date
-        if start_date:
-            df = df[df[date_col] >= start_date]
-        if end_date:
-            df = df[df[date_col] <= end_date]
-            
-    # 全欄位關鍵字不限大小寫比對 (case=False)
+    if df.empty:
+        return df
+    
+    # 在前端（Pandas）層級執行 case=False 與跨欄位關鍵字搜尋
     if keyword.strip():
         kw = keyword.strip().lower()
-        mask = df.astype(str).apply(lambda row: row.str.lower().str.contains(kw, na=False)).any(axis=1)
+        mask = df.apply(lambda row: row.astype(str).str.lower().str.contains(kw, regex=False).any(), axis=1)
         df = df[mask]
         
     return df
-
-# ------------------------------------------
-# Module D: Worker Management Logic
-# ------------------------------------------
-def get_all_workers() -> pd.DataFrame:
-    """取得完整同工清單"""
-    res = supabase.table("workers").select("*").order("name").execute()
-    return pd.DataFrame(res.data) if res.data else pd.DataFrame()
-
-def add_worker(name: str, primary_role: str, status: str = "在籍 (Active)") -> bool:
-    """新增同工紀錄"""
-    payload = {"name": name.strip(), "primary_role": primary_role, "status": status}
-    res = supabase.table("workers").insert(payload).execute()
-    return len(res.data) > 0
-
-def update_worker_status(worker_id: int, new_status: str) -> bool:
-    """更新指定同工狀態"""
-    res = supabase.table("workers").update({"status": new_status}).eq("id", worker_id).execute()
-    return len(res.data) > 0
-
-def delete_worker(worker_id: int) -> bool:
-    """刪除指定同工"""
-    res = supabase.table("workers").delete().eq("id", worker_id).execute()
-    return len(res.data) > 0

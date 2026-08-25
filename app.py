@@ -8,15 +8,15 @@ import streamlit as st
 import constants as c
 import database as db
 
-# 設定頁面配置
 st.set_page_config(page_title=c.APP_TITLE, page_icon="⛪", layout="wide")
 
 st.title(c.APP_TITLE)
 st.caption(c.APP_SUBTITLE)
 
-# ── 行數 21-35：共用時段與日期選擇區塊 ──
+# ── 第 18 行：引用 c.LABELS["date_section"] ──
 st.subheader(c.LABELS["date_section"])
 col_date, col_time = st.columns(2)
+
 with col_date:
     selected_date = st.date_input(c.LABELS["select_date"], value=datetime.date.today())
     date_str = selected_date.strftime("%Y-%m-%d")
@@ -27,7 +27,6 @@ with col_time:
         selected_time = st.text_input(c.LABELS["custom_time"], value="")
     else:
         selected_time = selected_time_option
-
 # ── 行數 37-45：主選單 Tabs 宣告 ──
 tab_grace, tab_venue, tab_roster, tab_search = st.tabs([
     c.LABELS["tab_grace"],

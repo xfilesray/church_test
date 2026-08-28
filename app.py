@@ -184,23 +184,30 @@ with tab_search:
         with col_q3:
             date_range = st.date_input(c.LABELS["date_range"], value=(datetime.date.today() - datetime.timedelta(days=30), datetime.date.today()))
             
-        if st.button(c.LABELS["btn_search"]):
-            table_map = {
-                "恩典紀錄": "grace_records",
-                "場地借用": "venue_bookings",
-                "事奉排班": "roster_records"
-            }
-            start_d = date_range[0].strftime("%Y-%m-%d") if len(date_range) > 0 else None
-            end_d = date_range[1].strftime("%Y-%m-%d") if len(date_range) > 1 else None
-            
-            df_result = db.query_records(table_map[module_choice], keyword=search_kw, start_date=start_d, end_date=end_d)
-            
-            if df_result.empty:
-                st.info(c.LABELS["no_data_found"])
-            else:
-                st.dataframe(df_result, use_container_width=True)
-                csv = df_result.to_csv(index=False).encode('utf-8-sig')
-                st.download_button(c.LABELS["export_csv"], data=csv, file_name=f"{module_choice}_export.csv", mime="text/csv")
+       # ── app.py ──
+
+if st.button(c.LABELS["btn_search"]):
+    table_map = {
+        "恩典紀錄": "grace_records",
+        "場地借用": "venue_bookings",
+        "事奉排班": "roster_records"
+    }
+    start_d = date_range[0].strftime("%Y-%m-%d") if len(date_range) > 0 else None
+    end_d = date_range[1].strftime("%Y-%m-%d") if len(date_range) > 1 else None
+    
+    target_table = table_map.get(module_choice, "grace_records")
+    df_result = db.query_records(target_table, keyword=search_kw, start_date=start_d, end_date=end_d)
+    
+    # 防禦性檢查：是否有 API 錯誤訊息
+    if "error" in df_result.columns:
+        st.error(df_result["error"].iloc[0])
+    elif df_result.empty:
+        st.info(c.LABELS["no_data_found"])
+    else:
+        st.dataframe(df_result, use_container_width=True)
+        csv = df_result.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(c.LABELS["export_csv"], data=csv, file_name=f"{module_choice}_export.csv", mime="text/csv")
+        
 
     with subtab_worker:
         st.subheader(c.LABELS["worker_mgmt_header"])

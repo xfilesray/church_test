@@ -116,28 +116,46 @@ def save_roster_record(date_str: str, time_slot: str, roles_data: Dict[str, str]
     return len(res.data) > 0
 
 # ── 模組 D：不限大小寫 & 跨中英文關鍵字查詢 ──
+# ── database.py ──
+from postgrest.exceptions import APIError
+
 def query_records(table_name: str, keyword: str = "", start_date: str = None, end_date: str = None) -> pd.DataFrame:
-    supabase = get_client()
-    query = supabase.table(table_name).select("*")
-    
-    if start_date:
-        query = query.gte("event_date", start_date)
-    if end_date:
-        query = query.lte("event_date", end_date)
+    """
+    查詢指定資料表紀錄，支援日期區間與 Pandas 層級的全欄位不限大小寫搜尋。
+    包含 PostgREST APIError 異常處理機制。
+    """
+    try:
+        supabase = get_client()
+        query = supabase.table(table_name).select("*")
         
-    res = query.execute()
-    df = pd.DataFrame(res.data)
-    
-    if df.empty:
+        # 僅在有指定日期時加入篩選條件
+        if start_date:
+            query = query.gte("event_date", start_date)
+        if end_date:
+            query = query.lte("event_date", end_date)
+            
+        res = query.execute()
+        df = pd.DataFrame(res.data)
+        
+        if df.empty:
+            return pd.DataFrame()
+        
+        # 跨欄位 case=False 關鍵字模糊搜尋
+        if keyword and keyword.strip():
+            kw = keyword.strip().lower()
+            mask = df.apply(lambda row: row.astype(str).str.lower().str.contains(kw, regex=False).any(), axis=1)
+            df = df[mask]
+            
         return df
-    
-    # 在前端（Pandas）層級執行 case=False 與跨欄位關鍵字搜尋
-    if keyword.strip():
-        kw = keyword.strip().lower()
-        mask = df.apply(lambda row: row.astype(str).str.lower().str.contains(kw, regex=False).any(), axis=1)
-        df = df[mask]
-        
-    return df
+
+    except APIError as e:
+        # 捕捉 Supabase PostgREST API 報錯（如 RLS 擋住、表名或欄位不存在）
+        print(f"[Supabase APIError] Table: {table_name}, Details: {e}")
+        # 回傳帶有錯誤標記的空 DataFrame，讓前端提示使用者
+        return pd.DataFrame({"error": [f"資料庫查詢失敗 (APIError)：請檢查 Supabase 是否已建立【{table_name}】資料表或已設定 RLS 存取權限。"]})
+    except Exception as e:
+        print(f"[Unexpected Error]: {e}")
+        return pd.DataFrame({"error": [f"系統發生未預期錯誤：{str(e)}"]})
 
 # ── database.py ──
 
